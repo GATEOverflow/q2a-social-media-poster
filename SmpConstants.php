@@ -24,7 +24,7 @@ class SmpConstants
 
     // Option keys
     const OPT_PREFIX = 'smp_';
-    const OPT_OPENAI_KEY = 'qa-openai-api-key';
+    const OPT_OPENAI_KEY = 'openai_api_key';
     const OPT_OPENAI_CONFIG = 'smp_openai_config';
     const OPT_INSTAGRAM_AUTO_IMAGE = 'smp_instagram_auto_image';
     const OPT_IMAGE_WIDTH = 'smp_image_width';
