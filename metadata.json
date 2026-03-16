@@ -1,13 +1,13 @@
 {
     "name": "Social Media Poster",
-    "uri": "",
-    "description": "Auto-post Q2A content (questions, exams, blogs, jobs) to multiple social media platforms with multi-account support and developer API",
+    "uri": "https://github.com/GATEOverflow/q2a-social-media-poster",
+    "description": "Auto-post Q2A content to multiple social media platforms with multi-account support and developer API",
     "version": "1.1.0",
     "date": "2026-03-16",
     "author": "GATEOverflow",
     "author_uri": "https://gateoverflow.in",
     "license": "MIT",
-    "update_uri": "",
+    "update_uri": "https://raw.githubusercontent.com/GATEOverflow/q2a-social-media-poster/refs/heads/main/metadata.json",
     "min_q2a": "1.8.0",
     "min_php": "7.4.0",
     "load_order": "after_db_init"
