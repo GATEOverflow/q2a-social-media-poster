@@ -14,7 +14,10 @@ class SmpEventQuestion
     }
 
     function process_event($event, $userid, $handle, $cookieid, $params)
+   
+    
     {
+        error_log("SMP Plugin Triggered: Question Posted");
         if ($event !== 'q_post') {
             return;
         }

@@ -4,6 +4,7 @@ if (!defined('QA_VERSION')) {
     header('Location: ../../');
     exit;
 }
+require_once dirname(__FILE__) . '/SmpConstants.php';
 
 // Register admin module
 qa_register_plugin_module('process', 'SmpAdmin.php', 'SmpAdmin', 'Social Media Poster Admin');
