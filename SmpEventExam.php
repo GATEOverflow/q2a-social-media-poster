@@ -1,0 +1,75 @@
+<?php
+
+/**
+ * Event handler for new exams (qa_exam_post_).
+ * Posts to enabled social media platforms.
+ */
+class SmpEventExam
+{
+    private string $directory;
+
+    function load_module($directory, $urltoroot)
+    {
+        $this->directory = $directory;
+    }
+
+    function process_event($event, $userid, $handle, $cookieid, $params)
+    {
+        if ($event !== 'qa_exam_post_') {
+            return;
+        }
+
+        require_once $this->directory . 'SmpConstants.php';
+        require_once $this->directory . 'SmpPoster.php';
+
+        $poster = new SmpPoster($this->directory);
+
+        // Check if any accounts are configured for exams
+        $accounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_EXAM);
+        if (empty($accounts)) {
+            return;
+        }
+
+        $title = $params['title'] ?? '';
+        $postId = $params['postid'] ?? 0;
+
+        // Build URL using exam path helper if available
+        if (function_exists('qa_exam_request')) {
+            $url = qa_path_absolute(qa_exam_request($postId, $title));
+        } else {
+            $url = qa_opt('site_url') . 'exam/' . $postId . '/' . urlencode($title);
+        }
+
+        // Generate message using OpenAI
+        $generatedMessage = $poster->openaiGenerateMessage($title);
+        $message = $generatedMessage . "\n\nLink: " . $url;
+
+        // Generate image if Instagram auto-image or YouTube auto-video is enabled
+        $imageUrl = null;
+        $accountPlatforms = array_column($accounts, '_platform');
+        $needsImage = (in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
+                && qa_opt(SmpConstants::OPT_INSTAGRAM_AUTO_IMAGE))
+            || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
+                && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));
+        if ($needsImage) {
+            require_once $this->directory . 'SmpImageGenerator.php';
+            $imageGen = new SmpImageGenerator();
+            $imageUrl = $imageGen->generateFromText($title, 'New Exam', $postId);
+        }
+
+        // Post to all enabled accounts
+        $results = $poster->postToAll(SmpConstants::CONTENT_EXAM, $message, $imageUrl);
+
+        // Report failures
+        foreach ($results as $accountId => $result) {
+            if (empty($result['success'])) {
+                $accountName = $result['account_name'] ?? $accountId;
+                $platform = $result['platform'] ?? 'unknown';
+                $poster->reportFailure(
+                    'Exam post failed on ' . $platform . ' (' . $accountName . ')',
+                    'Exam ID: ' . $postId . "\nTitle: " . $title . "\nError: " . ($result['error'] ?? 'Unknown')
+                );
+            }
+        }
+    }
+}

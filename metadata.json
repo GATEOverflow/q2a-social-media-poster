@@ -1,0 +1,14 @@
+{
+    "name": "Social Media Poster",
+    "uri": "",
+    "description": "Auto-post Q2A content (questions, exams, blogs, jobs) to multiple social media platforms with multi-account support and developer API",
+    "version": "1.1.0",
+    "date": "2026-03-16",
+    "author": "GATEOverflow",
+    "author_uri": "https://gateoverflow.in",
+    "license": "MIT",
+    "update_uri": "",
+    "min_q2a": "1.8.0",
+    "min_php": "7.4.0",
+    "load_order": "after_db_init"
+}

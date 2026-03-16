@@ -1,0 +1,206 @@
+# Social Media Poster for Question2Answer
+
+Automatically post your Q2A content to multiple social media platforms. Supports questions, blog posts, exams, jobs, and scheduled daily posts.
+
+## Features
+
+- **Multi-platform support**: Telegram, Facebook, X (Twitter), LinkedIn, WhatsApp, Instagram, YouTube Shorts
+- **Multiple accounts per platform**: Add as many Telegram channels or Facebook pages as you need
+- **Content type routing**: Control which accounts receive which types of posts
+- **Category-specific routing**: Send questions from specific categories to dedicated channels
+- **Auto-generated images**: Creates images for Instagram and YouTube Shorts from post content
+- **AI-powered messages**: Uses OpenAI to generate engaging social media posts
+- **Daily automated posts**: Question of the Day and Quote of the Day features
+- **Token expiry warnings**: Get email alerts before your API tokens expire
+- **Developer API**: Other plugins can use the posting functionality
+
+## Requirements
+
+- Question2Answer 1.8.0+
+- PHP 7.4+
+- cURL extension
+- GD extension (for image generation)
+- ffmpeg (optional, for YouTube Shorts video generation)
+
+## Installation
+
+1. Download and extract to your `qa-plugin` folder
+2. The folder should be named `social-media-poster`
+3. Go to Admin → Plugins and you should see "Social Media Poster"
+4. Configure your accounts in the plugin settings
+
+## Configuration
+
+### General Settings
+
+- **OpenAI API Key**: Enter your OpenAI API key for AI-generated messages. This key is shared with other Q2A plugins that use the `qa-openai-api-key` option.
+- **System Prompt**: Customize how OpenAI generates your social media posts.
+
+### Platform Accounts
+
+Add accounts for each platform you want to post to:
+
+| Platform | Required Credentials |
+|----------|---------------------|
+| Telegram | Bot Token, Chat ID |
+| Facebook | Page Access Token, Page ID |
+| X (Twitter) | API Key, API Secret, Access Token, Access Token Secret |
+| LinkedIn | Access Token, Author URN |
+| WhatsApp | Access Token, Phone Number ID, Recipient Phone |
+| Instagram | Access Token, Account ID |
+| YouTube | Client ID, Client Secret, Refresh Token |
+
+You can add multiple accounts per platform. Mark one as "Default" for each platform.
+
+### Content Type Routing
+
+For each content type (Question, Exam, Blog, Job, QOTD, Quote), select which accounts should receive posts. You can send to multiple accounts simultaneously.
+
+### Category Routing (Optional)
+
+If you have many categories and want certain categories to post to specific channels:
+
+1. Click "Show category settings"
+2. For each category, select additional accounts
+3. Check "Also post to default Question accounts" to post to both category-specific AND default accounts
+
+### Daily Posters
+
+- **Question of the Day**: Posts a random MCQ question from your database daily
+- **Quote of the Day**: Posts an AI-generated motivational quote daily
+
+Configure the hour when each should post (server time).
+
+## Custom Tables
+
+The plugin auto-detects custom Q2A tables:
+- `^exams` - Shows Exam content type
+- `^blogs` - Shows Blog content type  
+- `^jobs` - Shows Job content type
+
+If these tables don't exist, the corresponding content types won't appear in settings.
+
+## Developer API
+
+Other Q2A plugins can use the Social Media Poster functionality. Include the API file:
+
+```php
+require_once QA_PLUGIN_DIR . 'social-media-poster/SmpApi.php';
+```
+
+### Basic Posting
+
+```php
+// Post to all accounts configured for questions
+$results = smp_post('question', 'Check out this question!', 'https://yoursite.com/q/123');
+
+// Post to specific platforms
+$results = smp_post_to_platforms(['telegram', 'facebook'], 'Hello from my plugin!');
+
+// Post to a specific account
+$result = smp_post_to_account('telegram_abc12345', 'Direct to this channel');
+```
+
+### Generate Content
+
+```php
+// Generate an image for Instagram
+$imageUrl = smp_generate_image('Your text content here', 'Optional Title');
+
+// Generate a social media message using OpenAI
+$message = smp_generate_message('Your long article content...');
+```
+
+### Query Accounts
+
+```php
+// Check if plugin is configured
+if (smp_is_configured()) {
+    // Get all accounts
+    $accounts = smp_get_accounts();
+    
+    // Get accounts for a content type
+    $questionAccounts = smp_get_accounts_for_content('question');
+    
+    // With category routing
+    $physicsAccounts = smp_get_accounts_for_content('question', $categoryId);
+}
+```
+
+### Constants
+
+```php
+// Platform constants
+SMP_PLATFORM_TELEGRAM
+SMP_PLATFORM_FACEBOOK
+SMP_PLATFORM_X
+SMP_PLATFORM_LINKEDIN
+SMP_PLATFORM_WHATSAPP
+SMP_PLATFORM_INSTAGRAM
+SMP_PLATFORM_YOUTUBE
+
+// Content type constants
+SMP_CONTENT_QUESTION
+SMP_CONTENT_EXAM
+SMP_CONTENT_BLOG
+SMP_CONTENT_JOB
+SMP_CONTENT_QOTD
+SMP_CONTENT_QUOTE
+```
+
+### Return Format
+
+All posting functions return an array with results:
+
+```php
+[
+    'account_id' => [
+        'success' => true,
+        'platform' => 'telegram',
+        'account_name' => 'Physics Channel',
+        'response' => [...] // Platform-specific response
+    ],
+    'another_account' => [
+        'success' => false,
+        'error' => 'Rate limit exceeded',
+        'platform' => 'facebook',
+        'account_name' => 'Main Page'
+    ]
+]
+```
+
+## Events Handled
+
+The plugin listens for these Q2A events:
+- `q_post` - New question posted
+- `qa_exam_post_` - New exam created
+- `qas_blog_b_post` - New blog post
+- `qa_job_post` - New job listing
+
+## Troubleshooting
+
+**Posts not appearing?**
+- Check that the account is enabled (checkbox in account settings)
+- Verify credentials are correct
+- Check the content type is mapped to your account
+- Look for errors in PHP error log
+
+**Token expiry warnings?**
+- The plugin probes API tokens daily and sends email warnings at 7 and 2 days before expiry
+- Refresh your tokens before they expire
+
+**Images not generating?**
+- Ensure GD extension is installed and enabled
+- Check write permissions on `qa-uploads/smp-images/`
+
+**YouTube videos not uploading?**
+- Install ffmpeg on your server
+- Ensure the refresh token has YouTube upload scope
+
+## License
+
+MIT License
+
+## Support
+
+For issues and feature requests, please open an issue on GitHub.
