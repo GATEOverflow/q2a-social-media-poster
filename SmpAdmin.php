@@ -15,6 +15,7 @@ class SmpAdmin
 
     function option_default($option)
     {
+        require_once $this->directory . 'SmpConstants.php';
         $defaults = [
             SmpConstants::OPT_OPENAI_CONFIG => 'Create a short, engaging social media announcement for the following content. Keep it concise.',
             SmpConstants::OPT_INSTAGRAM_AUTO_IMAGE => '0',
