@@ -40,7 +40,10 @@ class SmpOAuthCallback
         }
 
         $code = qa_get('code');
-        $state = qa_get('state');
+
+        // Q2A consumes $_GET['state'] in qa_load_state() and stores it in $qa_state global
+        global $qa_state;
+        $state = $qa_state;
 
         if (empty($code) || empty($state) || strpos($state, 'smp_google_oauth_') !== 0) {
             $this->redirectToAdmin('oauth_error', 'Missing or invalid OAuth parameters.');
@@ -122,13 +125,10 @@ class SmpOAuthCallback
 
     private function redirectToAdmin(string $status, string $message): void
     {
-        $adminUrl = qa_path_absolute('admin/plugins');
-        $sep = (strpos($adminUrl, '?') !== false) ? '&' : '?';
-        $url = $adminUrl . $sep . http_build_query([
+        $url = qa_path_absolute('admin/plugins', [
             'smp_oauth' => $status,
             'smp_oauth_msg' => $message,
         ]);
-        header('Location: ' . $url);
-        exit;
+        qa_redirect_raw($url);
     }
 }
