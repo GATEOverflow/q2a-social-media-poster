@@ -117,8 +117,7 @@ class SmpDailyPoster
         // Generate image for Instagram/YouTube if needed
         $imageUrl = null;
         $accountPlatforms = array_column($accounts, '_platform');
-        $needsImage = (in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
-                && qa_opt(SmpConstants::OPT_INSTAGRAM_AUTO_IMAGE))
+        $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
                 && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));
         if ($needsImage) {
@@ -178,8 +177,7 @@ class SmpDailyPoster
         // Generate image for Instagram/YouTube if needed
         $imageUrl = null;
         $accountPlatforms = array_column($accounts, '_platform');
-        $needsImage = (in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
-                && qa_opt(SmpConstants::OPT_INSTAGRAM_AUTO_IMAGE))
+        $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
                 && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));
         if ($needsImage) {
