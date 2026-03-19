@@ -50,6 +50,9 @@ class SmpConstants
     const OPT_QUOTE_LAST_RUN = 'smp_quote_last_run';
     const OPT_QUOTE_PROMPT = 'smp_quote_prompt';
 
+    // Manual share settings
+    const OPT_MANUAL_SHARE_LEVEL = 'smp_manual_share_level';
+
     // Category routing
     const OPT_CATEGORY_ROUTING = 'smp_category_routing';
 

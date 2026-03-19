@@ -24,9 +24,10 @@ class SmpEventExam
 
         $poster = new SmpPoster($this->directory);
 
-        // Check if any accounts are configured for exams
-        $accounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_EXAM);
-        if (empty($accounts)) {
+        // Get auto-posting accounts + manually selected accounts
+        $autoAccounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_EXAM);
+        $manualAccounts = $poster->getManualShareAccounts(SmpConstants::CONTENT_EXAM);
+        if (empty($autoAccounts) && empty($manualAccounts)) {
             return;
         }
 
@@ -46,7 +47,8 @@ class SmpEventExam
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
-        $accountPlatforms = array_column($accounts, '_platform');
+        $allAccounts = $autoAccounts + $manualAccounts;
+        $accountPlatforms = array_column($allAccounts, '_platform');
         $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
                 && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));

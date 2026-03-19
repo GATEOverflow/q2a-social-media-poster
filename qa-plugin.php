@@ -22,3 +22,6 @@ qa_register_plugin_module('process', 'SmpDailyPoster.php', 'SmpDailyPoster', 'SM
 
 // Register Google OAuth callback page
 qa_register_plugin_module('page', 'SmpOAuthCallback.php', 'SmpOAuthCallback', 'SMP OAuth Callback');
+
+// Register layer for manual share checkboxes on post pages
+qa_register_plugin_layer('SmpLayer.php', 'Social Media Poster Layer');

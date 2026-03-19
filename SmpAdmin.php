@@ -20,6 +20,7 @@ class SmpAdmin
             SmpConstants::OPT_OPENAI_CONFIG => 'Create a short, engaging social media announcement for the following content. Keep it concise.',
             SmpConstants::OPT_INSTAGRAM_AUTO_IMAGE => '0',
             SmpConstants::OPT_YOUTUBE_AUTO_VIDEO => '0',
+            SmpConstants::OPT_MANUAL_SHARE_LEVEL => (string)QA_USER_LEVEL_EDITOR,
             SmpConstants::OPT_IMAGE_WIDTH => '1080',
             SmpConstants::OPT_IMAGE_HEIGHT => '1080',
             SmpConstants::OPT_IMAGE_BG_COLOR => '#FFFFFF',
@@ -161,6 +162,27 @@ class SmpAdmin
             'value' => qa_opt(SmpConstants::OPT_OPENAI_CONFIG),
             'tags' => 'NAME="smp_openai_config" SIZE="80"',
             'note' => 'System instructions for generating social media posts',
+        ];
+
+        $userLevels = [
+            QA_USER_LEVEL_BASIC => 'Registered Users',
+            QA_USER_LEVEL_APPROVED => 'Approved Users',
+            QA_USER_LEVEL_EXPERT => 'Experts',
+            QA_USER_LEVEL_EDITOR => 'Editors (default)',
+            QA_USER_LEVEL_MODERATOR => 'Moderators',
+            QA_USER_LEVEL_ADMIN => 'Admins',
+            QA_USER_LEVEL_SUPER => 'Super Admins',
+        ];
+        $currentLevel = (int)qa_opt(SmpConstants::OPT_MANUAL_SHARE_LEVEL);
+        $levelOptions = '';
+        foreach ($userLevels as $lvl => $label) {
+            $sel = ($lvl === $currentLevel) ? ' selected' : '';
+            $levelOptions .= '<option value="' . $lvl . '"' . $sel . '>' . $label . '</option>';
+        }
+        $fields['manual_share_level'] = [
+            'type' => 'static',
+            'label' => 'Manual share minimum level: <select name="smp_manual_share_level">' . $levelOptions . '</select>',
+            'note' => 'Users at or above this level see a "Share to Social Media" section when creating posts. Only accounts not already auto-posting for that content type are shown.',
         ];
 
         $fields['btn_save_general'] = [
@@ -1237,6 +1259,11 @@ class SmpAdmin
         }
 
         qa_opt(SmpConstants::OPT_OPENAI_CONFIG, qa_post_text('smp_openai_config'));
+
+        $manualLevel = qa_post_text('smp_manual_share_level');
+        if ($manualLevel !== null) {
+            qa_opt(SmpConstants::OPT_MANUAL_SHARE_LEVEL, (int)$manualLevel);
+        }
     }
 
     private function saveContentTypeSettings(): void

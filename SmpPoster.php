@@ -207,6 +207,50 @@ class SmpPoster
     }
 
     /**
+     * Get manually selected share accounts from POST data.
+     * Validates user level and returns only valid, enabled accounts
+     * that are NOT already in the auto-posting set for this content type.
+     *
+     * @param string $contentType Content type
+     * @param int|null $categoryId Optional category for routing
+     * @return array Account data keyed by account ID (with _platform)
+     */
+    public function getManualShareAccounts(string $contentType, ?int $categoryId = null): array
+    {
+        $selectedIds = $_POST['smp_share'] ?? [];
+        if (empty($selectedIds) || !is_array($selectedIds)) {
+            return [];
+        }
+
+        // Check user level
+        $minLevel = (int)qa_opt(SmpConstants::OPT_MANUAL_SHARE_LEVEL);
+        if ($minLevel === 0) {
+            $minLevel = QA_USER_LEVEL_EDITOR;
+        }
+        if (qa_get_logged_in_level() < $minLevel) {
+            return [];
+        }
+
+        // Get accounts that are already auto-posting
+        $autoAccounts = $this->getAccountsForPosting($contentType, $categoryId);
+        $allAccounts = $this->getAllAccountsById();
+        $result = [];
+
+        foreach ($selectedIds as $accountId) {
+            // Skip if already auto-posting, not a real account, or not enabled
+            if (isset($autoAccounts[$accountId])) {
+                continue;
+            }
+            if (!isset($allAccounts[$accountId]) || empty($allAccounts[$accountId]['enabled'])) {
+                continue;
+            }
+            $result[$accountId] = $allAccounts[$accountId];
+        }
+
+        return $result;
+    }
+
+    /**
      * Post message to all enabled accounts for a content type.
      * Supports account-level routing and category-specific overrides.
      *
@@ -220,6 +264,13 @@ class SmpPoster
     {
         $categoryId = $extra['categoryid'] ?? null;
         $accounts = $this->getAccountsForPosting($contentType, $categoryId);
+
+        // Merge manually selected accounts if present
+        $manualAccounts = $extra['_manual_accounts'] ?? [];
+        if (!empty($manualAccounts)) {
+            $accounts = $accounts + $manualAccounts;
+        }
+
         $results = [];
 
         foreach ($accounts as $accountId => $account) {
