@@ -752,7 +752,11 @@ class SmpPoster
 
         $data = json_decode($uploadResponse, true);
         if ($uploadCode === 200 && isset($data['id'])) {
-            return ['success' => true, 'response' => $data];
+            return [
+                'success' => true,
+                'response' => $data,
+                'video_url' => 'https://youtube.com/shorts/' . $data['id'],
+            ];
         }
 
         return ['success' => false, 'error' => 'YouTube upload failed (HTTP ' . $uploadCode . '): ' . $uploadResponse];

@@ -69,11 +69,13 @@ class SmpEventBlog
                 $accountName = $result['account_name'] ?? $accountId;
                 $platform = $result['platform'] ?? 'unknown';
                 $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
+                $videoUrl = $result['video_url'] ?? 'none';
                 $poster->reportFailure(
                     'Blog post failed on ' . $platform . ' (' . $accountName . ')',
                     'Blog ID: ' . $postId
                     . "\nTitle: " . $title
                     . "\nImage URL: " . $usedImageUrl
+                    . "\nVideo URL: " . $videoUrl
                     . "\nError: " . ($result['error'] ?? 'Unknown')
                     . "\n\n--- Message ---\n" . $message
                     . "\n\n--- Content ---\n" . $content

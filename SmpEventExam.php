@@ -65,11 +65,13 @@ class SmpEventExam
                 $accountName = $result['account_name'] ?? $accountId;
                 $platform = $result['platform'] ?? 'unknown';
                 $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
+                $videoUrl = $result['video_url'] ?? 'none';
                 $poster->reportFailure(
                     'Exam post failed on ' . $platform . ' (' . $accountName . ')',
                     'Exam ID: ' . $postId
                     . "\nTitle: " . $title
                     . "\nImage URL: " . $usedImageUrl
+                    . "\nVideo URL: " . $videoUrl
                     . "\nError: " . ($result['error'] ?? 'Unknown')
                     . "\n\n--- Message ---\n" . $message
                 );
