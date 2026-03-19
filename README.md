@@ -26,8 +26,17 @@ Automatically post your Q2A content to multiple social media platforms. Supports
 
 1. Download and extract to your `qa-plugin` folder
 2. The folder should be named `social-media-poster`
-3. Go to Admin → Plugins and you should see "Social Media Poster"
-4. Configure your accounts in the plugin settings
+3. Create the image upload directory and set permissions:
+   ```bash
+   mkdir -p /path/to/qa/qa-uploads/smp-images
+   chown www-data:www-data /path/to/qa/qa-uploads /path/to/qa/qa-uploads/smp-images
+   ```
+4. If your Q2A installation uses a separate document root (e.g., symlinked `qa-plugin`, `qa-include`, etc.), ensure `qa-uploads` is accessible from the public document root. For example:
+   ```bash
+   ln -s /path/to/qa/qa-uploads /path/to/public-docroot/qa-uploads
+   ```
+5. Go to Admin → Plugins and you should see "Social Media Poster"
+6. Configure your accounts in the plugin settings
 
 ## Configuration
 
@@ -51,6 +60,18 @@ Add accounts for each platform you want to post to:
 | YouTube | Client ID, Client Secret, Refresh Token |
 
 You can add multiple accounts per platform. Mark one as "Default" for each platform.
+
+### Token Auto-Refresh
+
+Meta platform tokens (Facebook, Instagram, WhatsApp) can be auto-refreshed before they expire:
+
+1. Go to the **Token Management** section in plugin settings
+2. Enter your **Meta App ID** and **Meta App Secret** (from [developers.facebook.com](https://developers.facebook.com/apps/))
+3. Save the settings
+
+The plugin will automatically exchange tokens for long-lived versions (~60 days) when they are within 7 days of expiry. You can also click **"Refresh Tokens Now"** to trigger a manual refresh at any time.
+
+**Note:** YouTube tokens use a refresh_token that doesn't expire (handled automatically). Telegram and X tokens never expire.
 
 ### Content Type Routing
 
@@ -187,11 +208,23 @@ The plugin listens for these Q2A events:
 
 **Token expiry warnings?**
 - The plugin probes API tokens daily and sends email warnings at 7 and 2 days before expiry
-- Refresh your tokens before they expire
+- Meta tokens (Facebook/Instagram/WhatsApp) are auto-refreshed when near expiry if App ID/Secret are configured
+- Use the "Refresh Tokens Now" button in admin to manually trigger a refresh
+- For LinkedIn, you need to manually re-authenticate when tokens expire
 
 **Images not generating?**
 - Ensure GD extension is installed and enabled
-- Check write permissions on `qa-uploads/smp-images/`
+- Check that `qa-uploads/smp-images/` exists and is writable by the web server (`www-data`)
+- If using a separate document root with symlinks, ensure `qa-uploads` is symlinked into the public document root
+
+**Instagram "media couldn't be fetched" error?**
+- The image URL must be publicly accessible to Facebook's servers
+- If using Cloudflare, add a WAF rule to allow the `facebookexternalhit` user-agent:
+  ```
+  (http.user_agent contains "facebookexternalhit") or (http.user_agent contains "Facebot")
+  ```
+  Action: Allow or Skip security checks
+- Verify the image URL returns HTTP 200 with `Content-Type: image/png`
 
 **YouTube videos not uploading?**
 - Install ffmpeg on your server

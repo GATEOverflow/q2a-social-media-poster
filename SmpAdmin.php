@@ -47,6 +47,31 @@ class SmpAdmin
 
         $saveAll = qa_clicked('smp_save_all');
 
+        // Handle manual Meta token refresh
+        if (qa_clicked('smp_refresh_meta_tokens')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $refreshResults = $poster->autoRefreshMetaTokens();
+            $message = 'Meta token refresh: ' . $this->formatRefreshResults($refreshResults);
+        }
+
+        // Handle manual Google token refresh
+        if (qa_clicked('smp_refresh_google_tokens')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $refreshResults = $poster->autoRefreshGoogleTokens();
+            $message = 'Google token refresh: ' . $this->formatRefreshResults($refreshResults);
+        }
+
+        // Show Google OAuth callback result
+        $oauthStatus = qa_get('smp_oauth');
+        if ($oauthStatus === 'oauth_success') {
+            $message = htmlspecialchars(qa_get('smp_oauth_msg') ?? 'Token updated.', ENT_QUOTES, 'UTF-8');
+            $saved = true;
+        } elseif ($oauthStatus === 'oauth_error') {
+            $message = 'OAuth error: ' . htmlspecialchars(qa_get('smp_oauth_msg') ?? 'Unknown error.', ENT_QUOTES, 'UTF-8');
+        }
+
         // Handle form submissions
         if (qa_clicked('smp_save_general') || $saveAll) {
             $this->saveGeneralSettings();
@@ -104,6 +129,8 @@ class SmpAdmin
         $fields = [];
         $buttons = [];
 
+        $isSuperAdmin = qa_get_logged_in_level() >= QA_USER_LEVEL_SUPER;
+
         // ========== SECTION: General / OpenAI Settings ==========
         $fields['section_general'] = [
             'type' => 'static',
@@ -111,13 +138,22 @@ class SmpAdmin
         ];
 
         $currentKey = qa_opt(SmpConstants::OPT_OPENAI_KEY);
-        $fields['openai_key'] = [
-            'label' => 'OpenAI API Key:',
-            'type' => 'text',
-            'value' => $currentKey,
-            'tags' => 'NAME="smp_openai_key" SIZE="60" placeholder="sk-..."',
-            'note' => 'Shared across plugins via <code>qa-openai-api-key</code> option. Changes here will affect other plugins using this key.',
-        ];
+        if ($isSuperAdmin) {
+            $fields['openai_key'] = [
+                'label' => 'OpenAI API Key:',
+                'type' => 'text',
+                'value' => $currentKey,
+                'tags' => 'NAME="smp_openai_key" SIZE="60" placeholder="sk-..."',
+                'note' => 'Shared across plugins via <code>qa-openai-api-key</code> option. Changes here will affect other plugins using this key.',
+            ];
+        } else {
+            $maskedKey = !empty($currentKey) ? substr($currentKey, 0, 5) . str_repeat('•', 20) : '<em>not set</em>';
+            $fields['openai_key'] = [
+                'type' => 'static',
+                'label' => 'OpenAI API Key: ' . $maskedKey,
+                'note' => 'Only super admins can view and edit API keys.',
+            ];
+        }
 
         $fields['openai_config'] = [
             'label' => 'OpenAI System Prompt:',
@@ -628,12 +664,20 @@ class SmpAdmin
                     foreach ($platformInfo['fields'] as $fi => $fieldKey) {
                         $fieldLabel = $platformInfo['labels'][$fi] ?? $fieldKey;
                         $credVal = $creds[$fieldKey] ?? '';
-                        $fields['acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey] = [
-                            'label' => '&nbsp;&nbsp;&nbsp;' . htmlspecialchars($fieldLabel, ENT_QUOTES, 'UTF-8') . ':',
-                            'type' => 'text',
-                            'value' => $credVal,
-                            'tags' => 'NAME="smp_acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey . '" SIZE="70" style="font-family:monospace;font-size:12px;"',
-                        ];
+                        if ($isSuperAdmin) {
+                            $fields['acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey] = [
+                                'label' => '&nbsp;&nbsp;&nbsp;' . htmlspecialchars($fieldLabel, ENT_QUOTES, 'UTF-8') . ':',
+                                'type' => 'text',
+                                'value' => $credVal,
+                                'tags' => 'NAME="smp_acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey . '" SIZE="70" style="font-family:monospace;font-size:12px;"',
+                            ];
+                        } else {
+                            $masked = !empty($credVal) ? substr($credVal, 0, 4) . str_repeat('•', 20) : '<em>not set</em>';
+                            $fields['acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey] = [
+                                'type' => 'static',
+                                'label' => '&nbsp;&nbsp;&nbsp;' . htmlspecialchars($fieldLabel, ENT_QUOTES, 'UTF-8') . ': ' . $masked,
+                            ];
+                        }
                     }
 
                     // Token expiry date (auto-detected, read-only display)
@@ -649,8 +693,18 @@ class SmpAdmin
                     $fields['acct_expiry_' . $platformId . '_' . $idx] = [
                         'type' => 'static',
                         'label' => '&nbsp;&nbsp;&nbsp;Token Expiry: ' . $expiryDisplay,
-                        'note' => 'Auto-detected from platform API. Warning emails sent at 7 and 2 days before expiry.',
+                        'note' => 'Auto-detected from platform API. Tokens are auto-refreshed when within 7 days of expiry.',
                     ];
+
+                    // Show last refreshed time if available
+                    $lastRefreshed = $account['token_last_refreshed'] ?? '';
+                    if (!empty($lastRefreshed)) {
+                        $fields['acct_refreshed_' . $platformId . '_' . $idx] = [
+                            'type' => 'static',
+                            'label' => '&nbsp;&nbsp;&nbsp;<em style="color:#888;font-size:12px;">Last refreshed: '
+                                . htmlspecialchars($lastRefreshed, ENT_QUOTES, 'UTF-8') . '</em>',
+                        ];
+                    }
 
                     // Delete button inline for this account
                     $fields['acct_delete_btn_' . $platformId . '_' . $idx] = [
@@ -680,6 +734,152 @@ class SmpAdmin
             ];
         }
 
+        // ========== SECTION: Token Management (at bottom) ==========
+        $fields['section_tokens'] = [
+            'type' => 'static',
+            'label' => '<h2 style="margin:20px 0 10px;border-bottom:2px solid #e91e63;padding-bottom:5px;color:#e91e63;">Token Management</h2>',
+        ];
+
+        $fields['token_desc'] = [
+            'type' => 'static',
+            'label' => 'Tokens are checked daily and refreshed automatically when within 7 days of expiry. You can also trigger manual refresh below.',
+        ];
+
+        $lastRefresh = qa_opt(SmpConstants::OPT_LAST_TOKEN_REFRESH) ?: 'Never';
+        $fields['token_status'] = [
+            'type' => 'static',
+            'label' => '<em style="color:#888;">Last auto-refresh: ' . htmlspecialchars($lastRefresh, ENT_QUOTES, 'UTF-8') . '</em>',
+        ];
+
+        // -- Meta Token Refresh --
+        $fields['meta_token_header'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:12px 0 5px;color:#555;">🔵 Meta (Facebook / Instagram / WhatsApp)</h3>',
+        ];
+
+        if ($isSuperAdmin) {
+            $fields['meta_app_id'] = [
+                'label' => 'Meta App ID:',
+                'type' => 'text',
+                'value' => qa_opt('smp_meta_app_id'),
+                'tags' => 'NAME="smp_meta_app_id" SIZE="40" placeholder="Your Facebook App ID"',
+                'note' => 'From <a href="https://developers.facebook.com/apps/" target="_blank">developers.facebook.com</a>.',
+            ];
+            $fields['meta_app_secret'] = [
+                'label' => 'Meta App Secret:',
+                'type' => 'text',
+                'value' => qa_opt('smp_meta_app_secret'),
+                'tags' => 'NAME="smp_meta_app_secret" SIZE="60" style="font-family:monospace;font-size:12px;" placeholder="Your Facebook App Secret"',
+                'note' => 'Used to exchange short-lived tokens for long-lived ones.',
+            ];
+        } else {
+            $maskedAppId = qa_opt('smp_meta_app_id');
+            $maskedAppSecret = qa_opt('smp_meta_app_secret');
+            $fields['meta_app_id'] = [
+                'type' => 'static',
+                'label' => 'Meta App ID: ' . (!empty($maskedAppId) ? substr($maskedAppId, 0, 4) . str_repeat('\u2022', 12) : '<em>not set</em>'),
+            ];
+            $fields['meta_app_secret'] = [
+                'type' => 'static',
+                'label' => 'Meta App Secret: ' . (!empty($maskedAppSecret) ? substr($maskedAppSecret, 0, 4) . str_repeat('\u2022', 20) : '<em>not set</em>'),
+                'note' => 'Only super admins can view and edit secrets.',
+            ];
+        }
+
+        // Show Meta account token statuses
+        $metaPlatformNames = [
+            SmpConstants::PLATFORM_FACEBOOK => 'Facebook',
+            SmpConstants::PLATFORM_INSTAGRAM => 'Instagram',
+            SmpConstants::PLATFORM_WHATSAPP => 'WhatsApp',
+        ];
+        foreach ($metaPlatformNames as $mpId => $mpName) {
+            $mpAccounts = $this->getAccounts($mpId);
+            foreach ($mpAccounts as $mi => $ma) {
+                if (empty($ma['enabled'])) continue;
+                $maName = $ma['name'] ?? $mpName;
+                $maExpiry = $ma['token_expiry_date'] ?? '';
+                $maRefreshed = $ma['token_last_refreshed'] ?? '';
+                $statusHtml = $mpName . ': <strong>' . htmlspecialchars($maName, ENT_QUOTES, 'UTF-8') . '</strong>';
+                if (!empty($maExpiry)) {
+                    $statusHtml .= ' — Expires: ' . htmlspecialchars($maExpiry, ENT_QUOTES, 'UTF-8');
+                } else {
+                    $statusHtml .= ' — <em>Expiry unknown</em>';
+                }
+                if (!empty($maRefreshed)) {
+                    $statusHtml .= ' (last refreshed: ' . htmlspecialchars($maRefreshed, ENT_QUOTES, 'UTF-8') . ')';
+                }
+                $fields['meta_status_' . $mpId . '_' . $mi] = [
+                    'type' => 'static',
+                    'label' => '&nbsp;&nbsp;&nbsp;' . $statusHtml,
+                ];
+            }
+        }
+
+        $fields['btn_refresh_meta'] = [
+            'type' => 'static',
+            'label' => '<button type="submit" name="smp_refresh_meta_tokens" style="background:#1877f2;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">🔄 Refresh Meta Tokens</button>'
+                . ' <button type="submit" name="smp_save_general" style="background:#4285f4;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;margin-left:8px;">Save Meta Settings</button>',
+        ];
+
+        // -- Google/YouTube Token Refresh --
+        $fields['google_token_header'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:16px 0 5px;color:#555;">🔴 Google (YouTube)</h3>',
+        ];
+
+        $ytAccounts = $this->getAccounts(SmpConstants::PLATFORM_YOUTUBE);
+        $hasExpiredYt = false;
+        foreach ($ytAccounts as $yi => $ya) {
+            if (empty($ya['enabled'])) continue;
+            $yaName = $ya['name'] ?? ('YouTube Account ' . ($yi + 1));
+            $yaExpiry = $ya['token_expiry_date'] ?? '';
+            $yaRefreshed = $ya['token_last_refreshed'] ?? '';
+            $yaSource = $ya['token_expiry_source'] ?? '';
+            $statusHtml = 'YouTube: <strong>' . htmlspecialchars($yaName, ENT_QUOTES, 'UTF-8') . '</strong>';
+
+            if ($yaSource === 'invalid') {
+                $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Invalid / Revoked</span>';
+                $hasExpiredYt = true;
+            } elseif (!empty($yaExpiry)) {
+                try {
+                    $yExpObj = new DateTime($yaExpiry);
+                    $yToday = new DateTime('today');
+                    if ($yExpObj < $yToday) {
+                        $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Expired: ' . htmlspecialchars($yaExpiry, ENT_QUOTES, 'UTF-8') . '</span>';
+                        $hasExpiredYt = true;
+                    } else {
+                        $statusHtml .= ' — Expires: ' . htmlspecialchars($yaExpiry, ENT_QUOTES, 'UTF-8');
+                    }
+                } catch (Exception $e) {
+                    $statusHtml .= ' — <span style="color:#ea4335;">Invalid date</span>';
+                    $hasExpiredYt = true;
+                }
+            } elseif ($yaSource === 'none') {
+                $statusHtml .= ' — <span style="color:#34a853;">Refresh token valid (never expires)</span>';
+            } else {
+                $statusHtml .= ' — <em>Not yet checked</em>';
+            }
+            if (!empty($yaRefreshed)) {
+                $statusHtml .= ' (last checked: ' . htmlspecialchars($yaRefreshed, ENT_QUOTES, 'UTF-8') . ')';
+            }
+            $fields['google_status_' . $yi] = [
+                'type' => 'static',
+                'label' => '&nbsp;&nbsp;&nbsp;' . $statusHtml,
+            ];
+        }
+
+        $googleBtns = '<button type="submit" name="smp_refresh_google_tokens" style="background:#ea4335;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">🔄 Validate Google Tokens</button>';
+
+        // Show manual OAuth renewal link if any YouTube token is expired/invalid
+        if ($hasExpiredYt && $isSuperAdmin) {
+            $googleBtns .= $this->buildGoogleOAuthRenewalHtml($ytAccounts);
+        }
+
+        $fields['btn_refresh_google'] = [
+            'type' => 'static',
+            'label' => $googleBtns,
+        ];
+
         // ========== Save All button at bottom ==========
         $fields['section_save_all'] = [
             'type' => 'static',
@@ -706,6 +906,80 @@ class SmpAdmin
     }
 
     // ========== Helper Methods ==========
+
+    /**
+     * Format refresh results into a readable string.
+     */
+    private function formatRefreshResults(array $results): string
+    {
+        $lines = [];
+        foreach ($results as $key => $r) {
+            if (is_string($r)) {
+                $lines[] = $r;
+            } else {
+                $line = ($r['platform'] ?? '') . ' / ' . ($r['account'] ?? '') . ': ' . ($r['status'] ?? '');
+                if (!empty($r['new_expiry'])) $line .= ' (new expiry: ' . $r['new_expiry'] . ')';
+                if (!empty($r['error'])) $line .= ' — ' . $r['error'];
+                if (!empty($r['reason'])) $line .= ' — ' . $r['reason'];
+                $lines[] = $line;
+            }
+        }
+        return empty($lines) ? 'No accounts to refresh.' : implode(' | ', $lines);
+    }
+
+    /**
+     * Build HTML for Google OAuth manual renewal flow.
+     */
+    private function buildGoogleOAuthRenewalHtml(array $ytAccounts): string
+    {
+        $html = '<div style="margin-top:12px;padding:12px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:5px;">';
+        $html .= '<strong style="color:#e65100;">⚠ Manual token renewal required</strong><br>';
+        $html .= '<p style="margin:8px 0;font-size:13px;">One or more YouTube refresh tokens are expired or invalid. '
+            . 'To renew, you need to re-authenticate with Google:</p>';
+
+        $redirectUri = qa_path_absolute('smp-oauth-callback');
+        $html .= '<div style="margin:8px 0;padding:8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:4px;font-size:12px;">';
+        $html .= '<strong>Required Redirect URI for Google Console:</strong> ';
+        $html .= '<code style="background:#fff;padding:2px 6px;border:1px solid #ddd;border-radius:3px;user-select:all;">'
+            . htmlspecialchars($redirectUri, ENT_QUOTES, 'UTF-8') . '</code>';
+        $html .= '<br><span style="color:#666;">Add this exact URI as an <em>Authorized redirect URI</em> in your '
+            . '<a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a> OAuth 2.0 client settings.</span>';
+        $html .= '</div>';
+
+        foreach ($ytAccounts as $yi => $ya) {
+            if (empty($ya['enabled'])) continue;
+            $creds = $ya['credentials'] ?? [];
+            $clientId = $creds['client_id'] ?? '';
+            if (empty($clientId)) continue;
+
+            $yaName = $ya['name'] ?? ('YouTube Account ' . ($yi + 1));
+
+            $authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
+                'client_id' => $clientId,
+                'redirect_uri' => $redirectUri,
+                'response_type' => 'code',
+                'scope' => 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube',
+                'access_type' => 'offline',
+                'prompt' => 'consent',
+                'state' => 'smp_google_oauth_' . $yi,
+            ]);
+
+            $html .= '<div style="margin:6px 0;">';
+            $html .= '<a href="' . htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8') . '" '
+                . 'style="background:#ea4335;color:#fff;padding:6px 14px;border-radius:3px;text-decoration:none;font-size:13px;">'
+                . '🔑 Re-authenticate: ' . htmlspecialchars($yaName, ENT_QUOTES, 'UTF-8') . '</a>';
+            $html .= '</div>';
+        }
+
+        $html .= '<div style="margin-top:10px;font-size:12px;color:#666;">';
+        $html .= 'Click the button above. After authenticating with Google, the token will be saved automatically and you will be redirected back here.';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
+    }
+
+
 
     private function getAccounts(string $platform): array
     {
@@ -936,11 +1210,25 @@ class SmpAdmin
 
     private function saveGeneralSettings(): void
     {
-        // Save OpenAI key (shared with other plugins)
-        $newKey = qa_post_text('smp_openai_key');
-        if ($newKey !== null) {
-            qa_opt(SmpConstants::OPT_OPENAI_KEY, trim($newKey));
+        $isSuperAdmin = qa_get_logged_in_level() >= QA_USER_LEVEL_SUPER;
+
+        // Only super admins can change API keys and secrets
+        if ($isSuperAdmin) {
+            $newKey = qa_post_text('smp_openai_key');
+            if ($newKey !== null) {
+                qa_opt(SmpConstants::OPT_OPENAI_KEY, trim($newKey));
+            }
+
+            $metaAppId = qa_post_text('smp_meta_app_id');
+            if ($metaAppId !== null) {
+                qa_opt('smp_meta_app_id', trim($metaAppId));
+            }
+            $metaAppSecret = qa_post_text('smp_meta_app_secret');
+            if ($metaAppSecret !== null) {
+                qa_opt('smp_meta_app_secret', trim($metaAppSecret));
+            }
         }
+
         qa_opt(SmpConstants::OPT_OPENAI_CONFIG, qa_post_text('smp_openai_config'));
     }
 
@@ -1033,6 +1321,7 @@ class SmpAdmin
 
     private function saveAccountSettings(string $platformId, array $platformInfo): void
     {
+        $isSuperAdmin = qa_get_logged_in_level() >= QA_USER_LEVEL_SUPER;
         $accounts = $this->getAccounts($platformId);
         $newDefaultIdx = null;
 
@@ -1045,10 +1334,13 @@ class SmpAdmin
                 $newDefaultIdx = $idx;
             }
 
-            foreach ($platformInfo['fields'] as $fieldKey) {
-                $val = qa_post_text('smp_acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey);
-                if ($val !== null) {
-                    $account['credentials'][$fieldKey] = $val;
+            // Only super admins can change credentials
+            if ($isSuperAdmin) {
+                foreach ($platformInfo['fields'] as $fieldKey) {
+                    $val = qa_post_text('smp_acct_cred_' . $platformId . '_' . $idx . '_' . $fieldKey);
+                    if ($val !== null) {
+                        $account['credentials'][$fieldKey] = $val;
+                    }
                 }
             }
 

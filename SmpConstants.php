@@ -36,6 +36,7 @@ class SmpConstants
     const OPT_YOUTUBE_AUTO_VIDEO = 'smp_youtube_auto_video';
     const OPT_LAST_EXPIRY_CHECK = 'smp_last_expiry_check';
     const OPT_EXPIRY_NOTIFIED = 'smp_expiry_notified';
+    const OPT_LAST_TOKEN_REFRESH = 'smp_last_token_refresh';
 
     // Daily poster option keys
     const OPT_QOTD_ENABLED = 'smp_qotd_enabled';

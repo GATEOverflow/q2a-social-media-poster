@@ -563,11 +563,18 @@ class SmpPoster
         $accountId = $creds['account_id'] ?? '';
 
         if (empty($accessToken) || empty($accountId)) {
-            return ['success' => false, 'error' => 'Missing Instagram credentials'];
+            return ['success' => false, 'error' => 'Missing Instagram credentials', 'image_url' => $imageUrl];
         }
 
         if (empty($imageUrl)) {
-            return ['success' => false, 'error' => 'Instagram requires an image URL'];
+            // Auto-generate image from caption text
+            require_once $this->directory . 'SmpImageGenerator.php';
+            $imageGen = new SmpImageGenerator();
+            $imageUrl = $imageGen->generateFromText($caption, '');
+        }
+
+        if (empty($imageUrl)) {
+            return ['success' => false, 'error' => 'Instagram requires an image URL and auto-generation failed (check GD extension, font availability, and qa-uploads directory permissions)', 'image_url' => null];
         }
 
         // Step 1: Create media container
@@ -589,12 +596,12 @@ class SmpPoster
         curl_close($ch);
 
         if ($error) {
-            return ['success' => false, 'error' => 'cURL error creating media: ' . $error];
+            return ['success' => false, 'error' => 'cURL error creating media: ' . $error, 'image_url' => $imageUrl];
         }
 
         $mediaObj = json_decode($response, true);
         if (!isset($mediaObj['id'])) {
-            return ['success' => false, 'error' => 'Failed to create media container: ' . $response];
+            return ['success' => false, 'error' => 'Failed to create media container: ' . $response, 'image_url' => $imageUrl];
         }
 
         // Step 2: Publish
@@ -615,15 +622,15 @@ class SmpPoster
         curl_close($ch);
 
         if ($error) {
-            return ['success' => false, 'error' => 'cURL error publishing: ' . $error];
+            return ['success' => false, 'error' => 'cURL error publishing: ' . $error, 'image_url' => $imageUrl];
         }
 
         $data = json_decode($response, true);
         if (isset($data['id'])) {
-            return ['success' => true, 'response' => $data];
+            return ['success' => true, 'response' => $data, 'image_url' => $imageUrl];
         }
 
-        return ['success' => false, 'error' => 'Failed to publish: ' . $response];
+        return ['success' => false, 'error' => 'Failed to publish: ' . $response, 'image_url' => $imageUrl];
     }
 
     /**
@@ -1037,8 +1044,13 @@ class SmpPoster
                 $detected = $this->probeTokenExpiry($platformId, $creds);
 
                 if ($detected !== null) {
-                    $account['token_expiry_date'] = $detected;
-                    $account['token_expiry_source'] = 'auto';
+                    if ($detected === 'invalid') {
+                        $account['token_expiry_date'] = '';
+                        $account['token_expiry_source'] = 'invalid';
+                    } else {
+                        $account['token_expiry_date'] = $detected;
+                        $account['token_expiry_source'] = 'auto';
+                    }
                     $accountsChanged = true;
                 } elseif (!isset($account['token_expiry_date'])) {
                     // No expiry detectable (e.g. Telegram bot tokens never expire)
@@ -1206,7 +1218,7 @@ class SmpPoster
 
         if (!$result['success']) {
             // Refresh failed — token is likely expired/revoked
-            return date('Y-m-d');
+            return 'invalid';
         }
 
         // Google access tokens expire in ~1 hour, but the refresh token doesn't expire
@@ -1295,5 +1307,246 @@ class SmpPoster
         if ($changed) {
             qa_opt(SmpConstants::OPT_EXPIRY_NOTIFIED, json_encode($notified));
         }
+    }
+
+    /**
+     * Refresh a Meta (Facebook/Instagram/WhatsApp) short-lived token
+     * to a long-lived token via the Graph API.
+     *
+     * @param string $accessToken Current access token
+     * @param string $appId Facebook App ID (optional, extracted from token debug if empty)
+     * @param string $appSecret Facebook App Secret
+     * @return array ['success' => bool, 'access_token' => string, 'expires_in' => int, 'error' => string]
+     */
+    public function refreshMetaToken(string $accessToken, string $appId, string $appSecret): array
+    {
+        if (empty($accessToken) || empty($appSecret)) {
+            return ['success' => false, 'error' => 'Missing access token or app secret'];
+        }
+
+        $url = 'https://graph.facebook.com/v21.0/oauth/access_token?' . http_build_query([
+            'grant_type' => 'fb_exchange_token',
+            'client_id' => $appId,
+            'client_secret' => $appSecret,
+            'fb_exchange_token' => $accessToken,
+        ]);
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return ['success' => false, 'error' => 'cURL error: ' . $error];
+        }
+
+        $data = json_decode($response, true);
+        if (!empty($data['access_token'])) {
+            return [
+                'success' => true,
+                'access_token' => $data['access_token'],
+                'expires_in' => $data['expires_in'] ?? 5184000, // ~60 days
+                'token_type' => $data['token_type'] ?? 'bearer',
+            ];
+        }
+
+        $errMsg = $data['error']['message'] ?? $response;
+        return ['success' => false, 'error' => 'Token exchange failed: ' . $errMsg];
+    }
+
+    /**
+     * Auto-refresh tokens for all enabled accounts.
+     * Called by SmpTokenChecker. Delegates to platform-specific methods.
+     *
+     * @return array Summary of refresh results per account
+     */
+    public function autoRefreshTokens(): array
+    {
+        $results = array_merge(
+            $this->autoRefreshMetaTokens(),
+            $this->autoRefreshGoogleTokens()
+        );
+
+        qa_opt(SmpConstants::OPT_LAST_TOKEN_REFRESH, date('Y-m-d H:i:s'));
+
+        return $results;
+    }
+
+    /**
+     * Auto-refresh Meta tokens (Facebook, Instagram, WhatsApp) when they
+     * are within 7 days of expiry.
+     *
+     * @return array Summary of refresh results per account
+     */
+    public function autoRefreshMetaTokens(): array
+    {
+        $appId = qa_opt('smp_meta_app_id');
+        $appSecret = qa_opt('smp_meta_app_secret');
+        $results = [];
+        $hasMetaCreds = !empty($appId) && !empty($appSecret);
+
+        if ($hasMetaCreds) {
+            $metaPlatforms = [
+                SmpConstants::PLATFORM_FACEBOOK => 'page_access_token',
+                SmpConstants::PLATFORM_INSTAGRAM => 'access_token',
+                SmpConstants::PLATFORM_WHATSAPP => 'access_token',
+            ];
+
+            foreach ($metaPlatforms as $platformId => $tokenField) {
+                $accounts = $this->getAccounts($platformId);
+                $accountsChanged = false;
+
+                foreach ($accounts as $idx => &$account) {
+                    if (empty($account['enabled'])) {
+                        continue;
+                    }
+
+                    $currentToken = $account['credentials'][$tokenField] ?? '';
+                    if (empty($currentToken)) {
+                        continue;
+                    }
+
+                    $accountName = $account['name'] ?? ('Account ' . ($idx + 1));
+                    $expiryDate = $account['token_expiry_date'] ?? '';
+
+                    // Only refresh if expiry is within 7 days or unknown
+                    $shouldRefresh = empty($expiryDate);
+                    if (!empty($expiryDate)) {
+                        try {
+                            $expiry = new DateTime($expiryDate);
+                            $today = new DateTime('today');
+                            $diff = $today->diff($expiry);
+                            $daysLeft = $diff->invert ? -$diff->days : $diff->days;
+                            $shouldRefresh = ($daysLeft <= 7);
+                        } catch (Exception $e) {
+                            $shouldRefresh = true;
+                        }
+                    }
+
+                    if (!$shouldRefresh) {
+                        $results[$platformId . '_' . $idx] = [
+                            'platform' => $platformId,
+                            'account' => $accountName,
+                            'status' => 'skipped',
+                            'reason' => 'Token not near expiry (expires: ' . $expiryDate . ')',
+                        ];
+                        continue;
+                    }
+
+                    $refreshResult = $this->refreshMetaToken($currentToken, $appId, $appSecret);
+
+                    if ($refreshResult['success']) {
+                        $account['credentials'][$tokenField] = $refreshResult['access_token'];
+                        $expiresIn = $refreshResult['expires_in'] ?? 5184000;
+                        $account['token_expiry_date'] = date('Y-m-d', time() + $expiresIn);
+                        $account['token_expiry_source'] = 'auto-refresh';
+                        $account['token_last_refreshed'] = date('Y-m-d H:i:s');
+                        $accountsChanged = true;
+
+                        $results[$platformId . '_' . $idx] = [
+                            'platform' => $platformId,
+                            'account' => $accountName,
+                            'status' => 'refreshed',
+                            'new_expiry' => $account['token_expiry_date'],
+                        ];
+                    } else {
+                        $results[$platformId . '_' . $idx] = [
+                            'platform' => $platformId,
+                            'account' => $accountName,
+                            'status' => 'failed',
+                            'error' => $refreshResult['error'],
+                        ];
+                    }
+                }
+                unset($account);
+
+                if ($accountsChanged) {
+                    $this->saveAccounts($platformId, $accounts);
+                }
+            }
+        } else {
+            // Check if any Meta accounts exist that would need credentials
+            foreach ([SmpConstants::PLATFORM_FACEBOOK, SmpConstants::PLATFORM_INSTAGRAM, SmpConstants::PLATFORM_WHATSAPP] as $mp) {
+                if (!empty($this->getEnabledAccounts($mp))) {
+                    $results['_meta_warning'] = 'Meta App ID/Secret not configured — cannot auto-refresh Facebook/Instagram/WhatsApp tokens';
+                    break;
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Validate Google/YouTube refresh tokens by attempting an access token refresh.
+     * Marks tokens as 'invalid' if the refresh token is revoked or broken.
+     *
+     * @return array Summary of refresh results per account
+     */
+    public function autoRefreshGoogleTokens(): array
+    {
+        $results = [];
+        $ytAccounts = $this->getAccounts(SmpConstants::PLATFORM_YOUTUBE);
+        $ytChanged = false;
+
+        foreach ($ytAccounts as $idx => &$ytAccount) {
+            if (empty($ytAccount['enabled'])) {
+                continue;
+            }
+
+            $creds = $ytAccount['credentials'] ?? [];
+            $clientId = $creds['client_id'] ?? '';
+            $clientSecret = $creds['client_secret'] ?? '';
+            $refreshToken = $creds['refresh_token'] ?? '';
+            $accountName = $ytAccount['name'] ?? ('YouTube Account ' . ($idx + 1));
+
+            if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+                $results['youtube_' . $idx] = [
+                    'platform' => 'youtube',
+                    'account' => $accountName,
+                    'status' => 'skipped',
+                    'reason' => 'Missing credentials',
+                ];
+                continue;
+            }
+
+            $refreshResult = $this->refreshGoogleAccessToken($clientId, $clientSecret, $refreshToken);
+
+            if ($refreshResult['success']) {
+                $ytAccount['token_expiry_date'] = null; // Refresh token doesn't expire
+                $ytAccount['token_expiry_source'] = 'none';
+                $ytAccount['token_last_refreshed'] = date('Y-m-d H:i:s');
+                $ytChanged = true;
+
+                $results['youtube_' . $idx] = [
+                    'platform' => 'youtube',
+                    'account' => $accountName,
+                    'status' => 'valid',
+                    'reason' => 'Refresh token is working (access token obtained)',
+                ];
+            } else {
+                // Refresh token is revoked/broken — mark as invalid
+                $ytAccount['token_expiry_source'] = 'invalid';
+                $ytAccount['token_last_refreshed'] = date('Y-m-d H:i:s');
+                $ytChanged = true;
+
+                $results['youtube_' . $idx] = [
+                    'platform' => 'youtube',
+                    'account' => $accountName,
+                    'status' => 'failed',
+                    'error' => $refreshResult['error'],
+                ];
+            }
+        }
+        unset($ytAccount);
+
+        if ($ytChanged) {
+            $this->saveAccounts(SmpConstants::PLATFORM_YOUTUBE, $ytAccounts);
+        }
+
+        return $results;
     }
 }

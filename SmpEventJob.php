@@ -59,12 +59,20 @@ class SmpEventJob
         // Post to all enabled accounts
         $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl);
 
-        // Log failures
+        // Report failures
         foreach ($results as $accountId => $result) {
-            if (!$result['success']) {
+            if (empty($result['success'])) {
                 $accountName = $result['account_name'] ?? $accountId;
                 $platform = $result['platform'] ?? 'unknown';
-                error_log("SMP Job post to $platform ($accountName) failed: " . $result['error']);
+                $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
+                $poster->reportFailure(
+                    'Job post failed on ' . $platform . ' (' . $accountName . ')',
+                    'Job ID: ' . $postId
+                    . "\nTitle: " . $title
+                    . "\nImage URL: " . $usedImageUrl
+                    . "\nError: " . ($result['error'] ?? 'Unknown')
+                    . "\n\n--- Message ---\n" . $message
+                );
             }
         }
     }

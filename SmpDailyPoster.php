@@ -132,9 +132,15 @@ class SmpDailyPoster
             if (empty($result['success'])) {
                 $accountName = $result['account_name'] ?? $accountId;
                 $platform = $result['platform'] ?? 'unknown';
+                $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
                 $poster->reportFailure(
                     'QOTD post failed on ' . $platform . ' (' . $accountName . ')',
-                    'Post ID: ' . $postId . "\nTitle: " . $title . "\nError: " . ($result['error'] ?? 'Unknown')
+                    'Post ID: ' . $postId
+                    . "\nTitle: " . $title
+                    . "\nImage URL: " . $usedImageUrl
+                    . "\nError: " . ($result['error'] ?? 'Unknown')
+                    . "\n\n--- Message ---\n" . $message
+                    . "\n\n--- Content ---\n" . ($content ?? '')
                 );
             }
         }
@@ -192,9 +198,12 @@ class SmpDailyPoster
             if (empty($result['success'])) {
                 $accountName = $result['account_name'] ?? $accountId;
                 $platform = $result['platform'] ?? 'unknown';
+                $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
                 $poster->reportFailure(
                     'Quote of the Day post failed on ' . $platform . ' (' . $accountName . ')',
-                    'Error: ' . ($result['error'] ?? 'Unknown')
+                    'Image URL: ' . $usedImageUrl
+                    . "\nError: " . ($result['error'] ?? 'Unknown')
+                    . "\n\n--- Message ---\n" . $quote
                 );
             }
         }

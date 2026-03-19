@@ -35,6 +35,11 @@ class SmpTokenChecker
         require_once QA_INCLUDE_DIR . 'app/emails.php';
 
         $poster = new SmpPoster($this->directory);
+
+        // Auto-refresh tokens that are near expiry
+        $poster->autoRefreshTokens();
+
+        // Probe and check remaining token expiry dates
         $poster->probeAndCheckTokenExpiry();
 
         return [];
