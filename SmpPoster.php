@@ -668,10 +668,26 @@ class SmpPoster
             return ['success' => false, 'error' => 'Video file not found: ' . $videoPath];
         }
 
-        // Step 3: Extract title (first line or first 100 chars) + #Shorts tag
-        $lines = explode("\n", $message, 2);
-        $title = mb_substr(trim($lines[0]), 0, 95) . ' #Shorts';
-        $description = $message;
+        // Step 3: Use original post title if available, otherwise extract from message
+        $title = $extra['title'] ?? '';
+        if (empty($title)) {
+            foreach (explode("\n", $message) as $line) {
+                $line = trim(strip_tags($line));
+                if ($line !== '' && !preg_match('#^https?://#i', $line)) {
+                    $title = $line;
+                    break;
+                }
+            }
+        }
+        if (empty($title)) {
+            $title = mb_substr(trim(strip_tags($message)), 0, 95);
+        }
+        if (empty($title)) {
+            $title = 'New Video';
+        }
+        $title = str_replace(['<', '>'], '', $title);
+        $title = mb_substr(trim($title), 0, 95) . ' #Shorts';
+        $description = strip_tags($message);
 
         // Step 4: Initialize resumable upload
         $metadata = [
@@ -706,7 +722,7 @@ class SmpPoster
         curl_close($ch);
 
         if ($httpCode !== 200) {
-            return ['success' => false, 'error' => 'YouTube upload init failed (HTTP ' . $httpCode . '): ' . $response];
+            return ['success' => false, 'error' => 'YouTube upload init failed (HTTP ' . $httpCode . '). Title used: [' . $title . ']. Response: ' . $response];
         }
 
         // Extract upload URL from Location header
@@ -806,8 +822,17 @@ class SmpPoster
      */
     private function generateShortsVideo(string $text, ?string $imageUrl = null): ?string
     {
-        // Check ffmpeg availability
-        $ffmpegPath = trim(shell_exec('which ffmpeg 2>/dev/null') ?? '');
+        // Check ffmpeg availability - try known paths first since Apache PATH may be limited
+        $ffmpegPath = '';
+        foreach (['/usr/bin/ffmpeg', '/usr/local/bin/ffmpeg', '/snap/bin/ffmpeg'] as $path) {
+            if (is_file($path) && is_executable($path)) {
+                $ffmpegPath = $path;
+                break;
+            }
+        }
+        if (empty($ffmpegPath)) {
+            $ffmpegPath = trim(shell_exec('which ffmpeg 2>/dev/null') ?? '');
+        }
         if (empty($ffmpegPath)) {
             return null;
         }

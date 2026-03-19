@@ -57,7 +57,7 @@ class SmpEventJob
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl);
+        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl, ['title' => $title]);
 
         // Report failures
         foreach ($results as $accountId => $result) {

@@ -126,7 +126,7 @@ class SmpDailyPoster
             $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
         }
 
-        $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl);
+        $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, ['title' => $title]);
 
         foreach ($results as $accountId => $result) {
             if (empty($result['success'])) {
@@ -194,7 +194,7 @@ class SmpDailyPoster
             $imageUrl = $imageGen->generateFromText($quote, 'Quote of the Day');
         }
 
-        $results = $poster->postToAll(SmpConstants::CONTENT_QUOTE, $quote, $imageUrl);
+        $results = $poster->postToAll(SmpConstants::CONTENT_QUOTE, $quote, $imageUrl, ['title' => 'Quote of the Day']);
 
         foreach ($results as $accountId => $result) {
             if (empty($result['success'])) {

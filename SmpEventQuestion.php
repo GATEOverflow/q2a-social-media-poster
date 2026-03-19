@@ -61,7 +61,7 @@ class SmpEventQuestion
         }
 
         // Post to all enabled accounts (with category routing)
-        $extra = ['categoryid' => $categoryId];
+        $extra = ['categoryid' => $categoryId, 'title' => $title];
         $results = $poster->postToAll(SmpConstants::CONTENT_QUESTION, $message, $imageUrl, $extra);
 
         // Report any failures

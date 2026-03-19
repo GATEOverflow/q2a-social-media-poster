@@ -61,7 +61,7 @@ class SmpEventBlog
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl);
+        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl, ['title' => $title]);
 
         // Report failures
         foreach ($results as $accountId => $result) {
