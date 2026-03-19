@@ -828,31 +828,37 @@ class SmpAdmin
         ];
 
         $ytAccounts = $this->getAccounts(SmpConstants::PLATFORM_YOUTUBE);
-        $hasExpiredYt = false;
+        $needsGoogleOAuth = false;
         foreach ($ytAccounts as $yi => $ya) {
             if (empty($ya['enabled'])) continue;
             $yaName = $ya['name'] ?? ('YouTube Account ' . ($yi + 1));
             $yaExpiry = $ya['token_expiry_date'] ?? '';
             $yaRefreshed = $ya['token_last_refreshed'] ?? '';
             $yaSource = $ya['token_expiry_source'] ?? '';
+            $creds = $ya['credentials'] ?? [];
+            $hasRefreshToken = !empty($creds['refresh_token']);
+            $hasClientId = !empty($creds['client_id']);
             $statusHtml = 'YouTube: <strong>' . htmlspecialchars($yaName, ENT_QUOTES, 'UTF-8') . '</strong>';
 
             if ($yaSource === 'invalid') {
                 $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Invalid / Revoked</span>';
-                $hasExpiredYt = true;
+                $needsGoogleOAuth = true;
+            } elseif ($hasClientId && !$hasRefreshToken) {
+                $statusHtml .= ' — <span style="color:#e65100;font-weight:bold;">Not authenticated — click below to connect</span>';
+                $needsGoogleOAuth = true;
             } elseif (!empty($yaExpiry)) {
                 try {
                     $yExpObj = new DateTime($yaExpiry);
                     $yToday = new DateTime('today');
                     if ($yExpObj < $yToday) {
                         $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Expired: ' . htmlspecialchars($yaExpiry, ENT_QUOTES, 'UTF-8') . '</span>';
-                        $hasExpiredYt = true;
+                        $needsGoogleOAuth = true;
                     } else {
                         $statusHtml .= ' — Expires: ' . htmlspecialchars($yaExpiry, ENT_QUOTES, 'UTF-8');
                     }
                 } catch (Exception $e) {
                     $statusHtml .= ' — <span style="color:#ea4335;">Invalid date</span>';
-                    $hasExpiredYt = true;
+                    $needsGoogleOAuth = true;
                 }
             } elseif ($yaSource === 'none') {
                 $statusHtml .= ' — <span style="color:#34a853;">Refresh token valid (never expires)</span>';
@@ -870,8 +876,8 @@ class SmpAdmin
 
         $googleBtns = '<button type="submit" name="smp_refresh_google_tokens" style="background:#ea4335;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">🔄 Validate Google Tokens</button>';
 
-        // Show manual OAuth renewal link if any YouTube token is expired/invalid
-        if ($hasExpiredYt && $isSuperAdmin) {
+        // Show OAuth authenticate/renewal link if any YouTube account needs it
+        if ($needsGoogleOAuth && $isSuperAdmin) {
             $googleBtns .= $this->buildGoogleOAuthRenewalHtml($ytAccounts);
         }
 
@@ -933,9 +939,8 @@ class SmpAdmin
     private function buildGoogleOAuthRenewalHtml(array $ytAccounts): string
     {
         $html = '<div style="margin-top:12px;padding:12px;background:#fff3e0;border:1px solid #ffe0b2;border-radius:5px;">';
-        $html .= '<strong style="color:#e65100;">⚠ Manual token renewal required</strong><br>';
-        $html .= '<p style="margin:8px 0;font-size:13px;">One or more YouTube refresh tokens are expired or invalid. '
-            . 'To renew, you need to re-authenticate with Google:</p>';
+        $html .= '<strong style="color:#e65100;">⚠ Google authentication required</strong><br>';
+        $html .= '<p style="margin:8px 0;font-size:13px;">One or more YouTube accounts need to be authenticated with Google:</p>';
 
         $redirectUri = qa_path_absolute('smp-oauth-callback');
         $html .= '<div style="margin:8px 0;padding:8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:4px;font-size:12px;">';
@@ -953,6 +958,8 @@ class SmpAdmin
             if (empty($clientId)) continue;
 
             $yaName = $ya['name'] ?? ('YouTube Account ' . ($yi + 1));
+            $hasToken = !empty($creds['refresh_token']);
+            $btnLabel = $hasToken ? '🔑 Re-authenticate: ' : '🔑 Authenticate: ';
 
             $authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
                 'client_id' => $clientId,
@@ -967,7 +974,7 @@ class SmpAdmin
             $html .= '<div style="margin:6px 0;">';
             $html .= '<a href="' . htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8') . '" '
                 . 'style="background:#ea4335;color:#fff;padding:6px 14px;border-radius:3px;text-decoration:none;font-size:13px;">'
-                . '🔑 Re-authenticate: ' . htmlspecialchars($yaName, ENT_QUOTES, 'UTF-8') . '</a>';
+                . $btnLabel . htmlspecialchars($yaName, ENT_QUOTES, 'UTF-8') . '</a>';
             $html .= '</div>';
         }
 
