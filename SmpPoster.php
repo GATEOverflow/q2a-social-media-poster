@@ -1005,7 +1005,7 @@ class SmpPoster
 
             $systemPrompt = $customPrompt . "\n\n"
                 . "IMPORTANT: Return EXACTLY {$remaining} quotes, one per line, numbered 1 through {$remaining}. "
-                . "Each quote should be complete with attribution. Format nicely for social media with a couple of relevant emojis. "
+                . "Each quote should be complete with attribution. Format nicely for social media. Do NOT use any emoji characters. "
                 . "Add relevant hashtags like #QuoteOfTheDay #Motivation. "
                 . "Do NOT include any extra text, headers, or explanations — just the numbered quotes.";
 
@@ -1049,7 +1049,7 @@ class SmpPoster
         }
 
         $systemPrompt = $customPrompt . "\n\n"
-            . "Return EXACTLY one motivational quote with attribution. Format nicely for social media with a couple of relevant emojis. "
+            . "Return EXACTLY one motivational quote with attribution. Format nicely for social media. Do NOT use any emoji characters. "
             . "Add relevant hashtags like #QuoteOfTheDay #Motivation. "
             . "Do NOT include any numbering, headers, or explanations — just the single quote.";
 
@@ -1105,24 +1105,58 @@ class SmpPoster
     }
 
     /**
-     * Get the saved quote bank from options.
+     * Get the saved quote bank from the smp_quotes table.
      */
     public function getQuoteBank(): array
     {
-        $json = qa_opt('smp_quote_bank');
-        if (empty($json)) {
-            return [];
+        $result = qa_db_query_sub(
+            'SELECT `id`, `quote_date` AS `date`, `quote_text` AS `quote`, `status` FROM ^smp_quotes ORDER BY `quote_date` ASC'
+        );
+        $bank = [];
+        while ($row = qa_db_read_one_assoc($result, true)) {
+            $bank[] = $row;
         }
-        $bank = json_decode($json, true);
-        return is_array($bank) ? $bank : [];
+        return $bank;
     }
 
     /**
-     * Save the quote bank to options.
+     * Save an entire quote bank to the smp_quotes table (replaces all existing).
      */
     public function saveQuoteBank(array $bank): void
     {
-        qa_opt('smp_quote_bank', json_encode($bank, JSON_UNESCAPED_UNICODE));
+        qa_db_query_sub('DELETE FROM ^smp_quotes');
+        foreach ($bank as $entry) {
+            qa_db_query_sub(
+                'INSERT INTO ^smp_quotes (`quote_date`, `quote_text`, `status`) VALUES ($, $, $)',
+                $entry['date'],
+                $entry['quote'],
+                $entry['status'] ?? 'pending'
+            );
+        }
+    }
+
+    /**
+     * Replace a single quote by its DB id.
+     */
+    public function replaceQuoteById(int $id, string $newQuote): void
+    {
+        qa_db_query_sub(
+            'UPDATE ^smp_quotes SET `quote_text` = $, `status` = \'pending\' WHERE `id` = #',
+            $newQuote,
+            $id
+        );
+    }
+
+    /**
+     * Edit a single quote's text by its DB id.
+     */
+    public function editQuoteById(int $id, string $newText): void
+    {
+        qa_db_query_sub(
+            'UPDATE ^smp_quotes SET `quote_text` = $ WHERE `id` = #',
+            $newText,
+            $id
+        );
     }
 
     /**
@@ -1130,14 +1164,13 @@ class SmpPoster
      */
     public function getTodayQuote(): ?string
     {
-        $bank = $this->getQuoteBank();
         $today = date('Y-m-d');
-        foreach ($bank as $entry) {
-            if ($entry['date'] === $today && $entry['status'] === 'pending') {
-                return $entry['quote'];
-            }
-        }
-        return null;
+        $result = qa_db_query_sub(
+            'SELECT `quote_text` FROM ^smp_quotes WHERE `quote_date` = $ AND `status` = \'pending\' LIMIT 1',
+            $today
+        );
+        $row = qa_db_read_one_assoc($result, true);
+        return $row ? $row['quote_text'] : null;
     }
 
     /**
@@ -1145,15 +1178,10 @@ class SmpPoster
      */
     public function markQuotePosted(string $date): void
     {
-        $bank = $this->getQuoteBank();
-        foreach ($bank as &$entry) {
-            if ($entry['date'] === $date) {
-                $entry['status'] = 'posted';
-                break;
-            }
-        }
-        unset($entry);
-        $this->saveQuoteBank($bank);
+        qa_db_query_sub(
+            'UPDATE ^smp_quotes SET `status` = \'posted\' WHERE `quote_date` = $',
+            $date
+        );
     }
 
     /**

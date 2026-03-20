@@ -39,6 +39,22 @@ class SmpAdmin
         return $defaults[$option] ?? null;
     }
 
+    function init_queries($tableslc)
+    {
+        $tablename = qa_db_add_table_prefix('smp_quotes');
+        if (!in_array($tablename, $tableslc)) {
+            return 'CREATE TABLE IF NOT EXISTS ^smp_quotes ('
+                . '`id` INT UNSIGNED NOT NULL AUTO_INCREMENT, '
+                . '`quote_date` DATE NOT NULL, '
+                . '`quote_text` TEXT NOT NULL, '
+                . '`status` VARCHAR(10) NOT NULL DEFAULT \'pending\', '
+                . 'PRIMARY KEY (`id`), '
+                . 'KEY `idx_date_status` (`quote_date`, `status`)'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+        }
+        return [];
+    }
+
     function admin_form(&$qa_content)
     {
         require_once $this->directory . 'SmpConstants.php';
@@ -109,15 +125,12 @@ class SmpAdmin
         if (qa_clicked('smp_replace_quote')) {
             require_once $this->directory . 'SmpPoster.php';
             $poster = new SmpPoster($this->directory);
-            $replaceIdx = (int)qa_post_text('smp_replace_quote_idx');
-            $bank = $poster->getQuoteBank();
-            if (isset($bank[$replaceIdx])) {
+            $replaceId = (int)qa_post_text('smp_replace_quote_id');
+            if ($replaceId > 0) {
                 $newQuote = $poster->generateSingleQuote();
                 if ($newQuote) {
-                    $bank[$replaceIdx]['quote'] = $newQuote;
-                    $bank[$replaceIdx]['status'] = 'pending';
-                    $poster->saveQuoteBank($bank);
-                    $message = 'Quote #' . ($replaceIdx + 1) . ' replaced.';
+                    $poster->replaceQuoteById($replaceId, $newQuote);
+                    $message = 'Quote #' . $replaceId . ' replaced.';
                     $saved = true;
                 } else {
                     $message = 'Failed to generate replacement quote.';
@@ -127,13 +140,11 @@ class SmpAdmin
         if (qa_clicked('smp_edit_quote')) {
             require_once $this->directory . 'SmpPoster.php';
             $poster = new SmpPoster($this->directory);
-            $editIdx = (int)qa_post_text('smp_edit_quote_idx');
+            $editId = (int)qa_post_text('smp_edit_quote_id');
             $editText = qa_post_text('smp_edit_quote_text');
-            $bank = $poster->getQuoteBank();
-            if (isset($bank[$editIdx]) && !empty(trim($editText))) {
-                $bank[$editIdx]['quote'] = trim($editText);
-                $poster->saveQuoteBank($bank);
-                $message = 'Quote #' . ($editIdx + 1) . ' updated.';
+            if ($editId > 0 && !empty(trim($editText))) {
+                $poster->editQuoteById($editId, trim($editText));
+                $message = 'Quote #' . $editId . ' updated.';
                 $saved = true;
             }
         }
@@ -1534,8 +1545,8 @@ class SmpAdmin
             $html .= '</div>';
 
             // Hidden fields for replace/edit actions
-            $html .= '<input type="hidden" name="smp_replace_quote_idx" id="sqb_replace_idx" value="">';
-            $html .= '<input type="hidden" name="smp_edit_quote_idx" id="sqb_edit_idx" value="">';
+            $html .= '<input type="hidden" name="smp_replace_quote_id" id="sqb_replace_id" value="">';
+            $html .= '<input type="hidden" name="smp_edit_quote_id" id="sqb_edit_id" value="">';
             $html .= '<input type="hidden" name="smp_edit_quote_text" id="sqb_edit_text" value="">';
 
             // Quote table
@@ -1550,6 +1561,7 @@ class SmpAdmin
             $html .= '</tr></thead><tbody>';
 
             foreach ($bank as $idx => $entry) {
+                $entryId = (int)$entry['id'];
                 $date = $entry['date'];
                 $isToday = ($date === $today);
                 $isPast = ($date < $today);
@@ -1560,7 +1572,7 @@ class SmpAdmin
                 elseif ($isPosted) $rowClass = 'sqb-posted';
                 elseif ($isPast) $rowClass = 'sqb-past';
 
-                $html .= '<tr class="' . $rowClass . '" id="sqb-row-' . $idx . '">';
+                $html .= '<tr class="' . $rowClass . '" id="sqb-row-' . $entryId . '">';
                 $html .= '<td>' . ($idx + 1) . '</td>';
 
                 $dayName = date('D', strtotime($date));
@@ -1569,8 +1581,8 @@ class SmpAdmin
                 $quoteHtml = htmlspecialchars(mb_strimwidth($entry['quote'], 0, 200, '...'), ENT_QUOTES, 'UTF-8');
                 $quoteFull = htmlspecialchars($entry['quote'], ENT_QUOTES, 'UTF-8');
                 $html .= '<td class="sqb-quote-text">';
-                $html .= '<span class="sqb-quote-display-' . $idx . '" title="' . $quoteFull . '">' . $quoteHtml . '</span>';
-                $html .= '<textarea class="sqb-edit-area" id="sqb-edit-area-' . $idx . '">' . $quoteFull . '</textarea>';
+                $html .= '<span class="sqb-quote-display-' . $entryId . '" title="' . $quoteFull . '">' . $quoteHtml . '</span>';
+                $html .= '<textarea class="sqb-edit-area" id="sqb-edit-area-' . $entryId . '">' . $quoteFull . '</textarea>';
                 $html .= '</td>';
 
                 // Status badge
@@ -1587,9 +1599,9 @@ class SmpAdmin
                 // Actions
                 $html .= '<td>';
                 $html .= '<button type="submit" name="smp_replace_quote" value="1" class="sqb-btn sqb-btn-replace" ';
-                $html .= 'onclick="document.getElementById(\'sqb_replace_idx\').value=' . $idx . ';return confirm(\'Replace this quote with a new AI-generated one?\')" ';
+                $html .= 'onclick="document.getElementById(\'sqb_replace_id\').value=' . $entryId . ';return confirm(\'Replace this quote with a new AI-generated one?\')" ';
                 $html .= 'title="Replace with new AI quote">Replace</button> ';
-                $html .= '<button type="button" class="sqb-btn sqb-btn-edit" onclick="sqbToggleEdit(' . $idx . ')" title="Edit manually">Edit</button>';
+                $html .= '<button type="button" class="sqb-btn sqb-btn-edit" onclick="sqbToggleEdit(' . $entryId . ')" title="Edit manually">Edit</button>';
                 $html .= '</td>';
                 $html .= '</tr>';
             }
@@ -1599,9 +1611,9 @@ class SmpAdmin
 
             // JavaScript
             $html .= '<script>
-            function sqbToggleEdit(idx) {
-                var area = document.getElementById("sqb-edit-area-" + idx);
-                var display = document.querySelector(".sqb-quote-display-" + idx);
+            function sqbToggleEdit(id) {
+                var area = document.getElementById("sqb-edit-area-" + id);
+                var display = document.querySelector(".sqb-quote-display-" + id);
                 if (area.style.display === "none" || area.style.display === "") {
                     area.style.display = "block";
                     display.style.display = "none";
@@ -1610,7 +1622,7 @@ class SmpAdmin
                     area.onblur = function() {
                         var newText = area.value.trim();
                         if (newText && newText !== display.textContent) {
-                            document.getElementById("sqb_edit_idx").value = idx;
+                            document.getElementById("sqb_edit_id").value = id;
                             document.getElementById("sqb_edit_text").value = newText;
                             // Submit the form
                             var btn = document.createElement("input");
