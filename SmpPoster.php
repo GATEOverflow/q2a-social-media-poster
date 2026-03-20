@@ -968,21 +968,108 @@ class SmpPoster
         return null;
     }
 
+    // ==================== Quote Bank Methods ====================
+
     /**
-     * Call OpenAI to generate a social media message.
+     * Generate a bank of quotes using OpenAI, scheduled starting from a given date.
+     * Makes 10 API calls of 10 quotes each to get 100 total.
+     *
+     * @param string $startDate YYYY-MM-DD
+     * @param int $count Number of quotes to generate
+     * @param string $customPrompt Optional custom prompt
+     * @return array Generated quote bank [{date, quote, status}, ...]
      */
-    public function openaiGenerateMessage(string $content, string $systemPrompt = ''): string
+    public function generateQuoteBank(string $startDate, int $count = 100, string $customPrompt = ''): array
     {
         $apiKey = qa_opt(SmpConstants::OPT_OPENAI_KEY);
         if (empty($apiKey)) {
-            return $content;
+            return [];
         }
 
-        if (empty($systemPrompt)) {
-            $systemPrompt = qa_opt(SmpConstants::OPT_OPENAI_CONFIG);
+        if (empty($customPrompt)) {
+            $customPrompt = qa_opt(SmpConstants::OPT_QUOTE_PROMPT);
         }
-        if (empty($systemPrompt)) {
-            $systemPrompt = 'Create a short social media announcement for the following content. Keep it engaging and concise.';
+        if (empty($customPrompt)) {
+            $customPrompt = 'Generate motivational quotes suitable for students preparing for competitive exams like GATE CSE. '
+                . 'Include the quote and attribute it to a famous person or mark it as anonymous.';
+        }
+
+        $bank = [];
+        $batchSize = 10;
+        $batches = (int)ceil($count / $batchSize);
+        $date = new DateTime($startDate);
+
+        for ($b = 0; $b < $batches && count($bank) < $count; $b++) {
+            $remaining = min($batchSize, $count - count($bank));
+            $batchNum = $b + 1;
+
+            $systemPrompt = $customPrompt . "\n\n"
+                . "IMPORTANT: Return EXACTLY {$remaining} quotes, one per line, numbered 1 through {$remaining}. "
+                . "Each quote should be complete with attribution. Format nicely for social media with a couple of relevant emojis. "
+                . "Add relevant hashtags like #QuoteOfTheDay #Motivation. "
+                . "Do NOT include any extra text, headers, or explanations — just the numbered quotes.";
+
+            $userMsg = "Generate batch {$batchNum} of {$batches}: {$remaining} unique motivational quotes. "
+                . "Make each one different in theme and source. Batch {$batchNum} should be distinct from previous batches.";
+
+            $response = $this->callOpenAI($systemPrompt, $userMsg, 2000);
+            if (empty($response)) {
+                continue;
+            }
+
+            // Parse numbered lines
+            $lines = preg_split('/\n(?=\d+[\.\)]\s)/', trim($response));
+            foreach ($lines as $line) {
+                if (count($bank) >= $count) break;
+                $quote = preg_replace('/^\d+[\.\)]\s*/', '', trim($line));
+                if (mb_strlen($quote) < 10) continue;
+
+                $bank[] = [
+                    'date' => $date->format('Y-m-d'),
+                    'quote' => $quote,
+                    'status' => 'pending',
+                ];
+                $date->modify('+1 day');
+            }
+        }
+
+        return $bank;
+    }
+
+    /**
+     * Generate a single replacement quote via OpenAI.
+     */
+    public function generateSingleQuote(string $customPrompt = ''): ?string
+    {
+        if (empty($customPrompt)) {
+            $customPrompt = qa_opt(SmpConstants::OPT_QUOTE_PROMPT);
+        }
+        if (empty($customPrompt)) {
+            $customPrompt = 'Generate motivational quotes suitable for students preparing for competitive exams like GATE CSE.';
+        }
+
+        $systemPrompt = $customPrompt . "\n\n"
+            . "Return EXACTLY one motivational quote with attribution. Format nicely for social media with a couple of relevant emojis. "
+            . "Add relevant hashtags like #QuoteOfTheDay #Motivation. "
+            . "Do NOT include any numbering, headers, or explanations — just the single quote.";
+
+        $response = $this->callOpenAI($systemPrompt, 'Generate one unique motivational quote.', 400);
+        if (empty($response)) {
+            return null;
+        }
+
+        $quote = preg_replace('/^\d+[\.\)]\s*/', '', trim($response));
+        return mb_strlen($quote) >= 10 ? $quote : null;
+    }
+
+    /**
+     * Low-level OpenAI chat completion call.
+     */
+    private function callOpenAI(string $systemPrompt, string $userMessage, int $maxTokens = 300): ?string
+    {
+        $apiKey = qa_opt(SmpConstants::OPT_OPENAI_KEY);
+        if (empty($apiKey)) {
+            return null;
         }
 
         $url = 'https://api.openai.com/v1/chat/completions';
@@ -990,15 +1077,15 @@ class SmpPoster
             'model' => 'gpt-4o-mini',
             'messages' => [
                 ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $content],
+                ['role' => 'user', 'content' => $userMessage],
             ],
-            'max_tokens' => 300,
+            'max_tokens' => $maxTokens,
         ];
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
             'Authorization: Bearer ' . $apiKey,
@@ -1010,11 +1097,79 @@ class SmpPoster
         curl_close($ch);
 
         if ($error || $response === false) {
-            return $content;
+            return null;
         }
 
         $result = json_decode($response, true);
-        return $result['choices'][0]['message']['content'] ?? $content;
+        return $result['choices'][0]['message']['content'] ?? null;
+    }
+
+    /**
+     * Get the saved quote bank from options.
+     */
+    public function getQuoteBank(): array
+    {
+        $json = qa_opt('smp_quote_bank');
+        if (empty($json)) {
+            return [];
+        }
+        $bank = json_decode($json, true);
+        return is_array($bank) ? $bank : [];
+    }
+
+    /**
+     * Save the quote bank to options.
+     */
+    public function saveQuoteBank(array $bank): void
+    {
+        qa_opt('smp_quote_bank', json_encode($bank, JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Get today's quote from the bank. Returns null if not found.
+     */
+    public function getTodayQuote(): ?string
+    {
+        $bank = $this->getQuoteBank();
+        $today = date('Y-m-d');
+        foreach ($bank as $entry) {
+            if ($entry['date'] === $today && $entry['status'] === 'pending') {
+                return $entry['quote'];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Mark today's quote as posted.
+     */
+    public function markQuotePosted(string $date): void
+    {
+        $bank = $this->getQuoteBank();
+        foreach ($bank as &$entry) {
+            if ($entry['date'] === $date) {
+                $entry['status'] = 'posted';
+                break;
+            }
+        }
+        unset($entry);
+        $this->saveQuoteBank($bank);
+    }
+
+    /**
+     * Call OpenAI to generate a social media message.
+     */
+    public function openaiGenerateMessage(string $content, string $systemPrompt = ''): string
+    {
+        if (empty($systemPrompt)) {
+            $systemPrompt = qa_opt(SmpConstants::OPT_OPENAI_CONFIG);
+        }
+        if (empty($systemPrompt)) {
+            $systemPrompt = 'Create a short social media announcement for the following content. Keep it engaging and concise.';
+        }
+
+        $result = $this->callOpenAI($systemPrompt, $content, 300);
+        return $result ?? $content;
     }
 
     /**

@@ -90,6 +90,53 @@ class SmpAdmin
             $this->saveDailySettings();
             $saved = true;
         }
+
+        // Quote bank actions
+        if (qa_clicked('smp_generate_quote_bank')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $startDate = qa_post_text('smp_quote_bank_start') ?: date('Y-m-d');
+            $count = max(10, min(200, (int)(qa_post_text('smp_quote_bank_count') ?: 100)));
+            $bank = $poster->generateQuoteBank($startDate, $count);
+            if (!empty($bank)) {
+                $poster->saveQuoteBank($bank);
+                $message = count($bank) . ' quotes generated starting from ' . htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8') . '.';
+                $saved = true;
+            } else {
+                $message = 'Failed to generate quotes. Check your OpenAI API key.';
+            }
+        }
+        if (qa_clicked('smp_replace_quote')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $replaceIdx = (int)qa_post_text('smp_replace_quote_idx');
+            $bank = $poster->getQuoteBank();
+            if (isset($bank[$replaceIdx])) {
+                $newQuote = $poster->generateSingleQuote();
+                if ($newQuote) {
+                    $bank[$replaceIdx]['quote'] = $newQuote;
+                    $bank[$replaceIdx]['status'] = 'pending';
+                    $poster->saveQuoteBank($bank);
+                    $message = 'Quote #' . ($replaceIdx + 1) . ' replaced.';
+                    $saved = true;
+                } else {
+                    $message = 'Failed to generate replacement quote.';
+                }
+            }
+        }
+        if (qa_clicked('smp_edit_quote')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $editIdx = (int)qa_post_text('smp_edit_quote_idx');
+            $editText = qa_post_text('smp_edit_quote_text');
+            $bank = $poster->getQuoteBank();
+            if (isset($bank[$editIdx]) && !empty(trim($editText))) {
+                $bank[$editIdx]['quote'] = trim($editText);
+                $poster->saveQuoteBank($bank);
+                $message = 'Quote #' . ($editIdx + 1) . ' updated.';
+                $saved = true;
+            }
+        }
         if (qa_clicked('smp_save_category_routing') || $saveAll) {
             $this->saveCategoryRouting();
             $saved = true;
@@ -528,6 +575,18 @@ class SmpAdmin
         $fields['btn_save_daily_settings'] = [
             'type' => 'static',
             'label' => '<button type="submit" name="smp_save_daily_settings" style="background:#9c27b0;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">Save Daily Poster Settings</button>',
+        ];
+
+        // -- Quote Bank --
+        $fields['quote_bank_header'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:16px 0 5px;color:#555;">Quote Bank</h3>',
+        ];
+
+        $quoteBankHtml = $this->buildQuoteBankUI();
+        $fields['quote_bank'] = [
+            'type' => 'custom',
+            'html' => $quoteBankHtml,
         ];
 
         // ========== SECTION: Instagram & YouTube Media Settings ==========
@@ -1401,5 +1460,181 @@ class SmpAdmin
         }
 
         $this->saveAccounts($platformId, $accounts);
+    }
+
+    // ==================== Quote Bank UI ====================
+
+    private function buildQuoteBankUI(): string
+    {
+        require_once $this->directory . 'SmpPoster.php';
+        $poster = new SmpPoster($this->directory);
+        $bank = $poster->getQuoteBank();
+
+        $today = date('Y-m-d');
+        $defaultStart = empty($bank) ? $today : $today;
+        $totalQuotes = count($bank);
+        $pendingCount = 0;
+        $postedCount = 0;
+        foreach ($bank as $entry) {
+            if ($entry['status'] === 'posted') $postedCount++;
+            else $pendingCount++;
+        }
+
+        $html = '<style>
+            .sqb-wrap { margin:10px 0; }
+            .sqb-gen-row { display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+            .sqb-gen-row label { font-weight:500; font-size:13px; color:#555; }
+            .sqb-gen-row input { padding:5px 8px; border:1px solid #ccc; border-radius:3px; font-size:13px; }
+            .sqb-gen-btn { background:#9c27b0; color:#fff; border:none; padding:8px 20px; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500; }
+            .sqb-gen-btn:hover { background:#7b1fa2; }
+            .sqb-stats { background:#f5f5f5; padding:8px 14px; border-radius:4px; font-size:13px; color:#555; margin-bottom:10px; }
+            .sqb-table { width:100%; border-collapse:collapse; font-size:12px; }
+            .sqb-table th { background:#f1f3f4; padding:6px 8px; text-align:left; border-bottom:2px solid #ddd; font-size:11px; position:sticky; top:0; }
+            .sqb-table td { padding:6px 8px; border-bottom:1px solid #eee; vertical-align:top; }
+            .sqb-table tr:hover { background:#f8f9fa; }
+            .sqb-table tr.sqb-posted td { color:#999; }
+            .sqb-table tr.sqb-today { background:#e8f5e9 !important; }
+            .sqb-table tr.sqb-past td { color:#bbb; }
+            .sqb-badge { display:inline-block; padding:1px 6px; border-radius:8px; font-size:10px; font-weight:500; }
+            .sqb-badge-pending { background:#fff3cd; color:#856404; }
+            .sqb-badge-posted { background:#d4edda; color:#155724; }
+            .sqb-badge-today { background:#e8f5e9; color:#2e7d32; }
+            .sqb-btn { padding:2px 8px; border:1px solid #ccc; border-radius:3px; background:#fff; cursor:pointer; font-size:11px; }
+            .sqb-btn:hover { background:#f0f0f0; }
+            .sqb-btn-replace { color:#9c27b0; border-color:#9c27b0; }
+            .sqb-btn-replace:hover { background:#f3e5f5; }
+            .sqb-btn-edit { color:#1976d2; border-color:#1976d2; }
+            .sqb-btn-edit:hover { background:#e3f2fd; }
+            .sqb-quote-text { max-width:500px; line-height:1.4; }
+            .sqb-edit-area { width:100%; min-height:60px; padding:4px 6px; border:1px solid #ccc; border-radius:3px; font-size:12px; font-family:inherit; resize:vertical; margin-top:4px; display:none; }
+        </style>';
+
+        $html .= '<div class="sqb-wrap">';
+
+        // Generate controls
+        $html .= '<div class="sqb-gen-row">';
+        $html .= '<label>Start date:</label>';
+        $html .= '<input type="date" name="smp_quote_bank_start" value="' . htmlspecialchars($defaultStart, ENT_QUOTES, 'UTF-8') . '">';
+        $html .= '<label>Count:</label>';
+        $html .= '<input type="number" name="smp_quote_bank_count" value="100" min="10" max="200" style="width:70px">';
+        $html .= '<button type="submit" name="smp_generate_quote_bank" class="sqb-gen-btn" ';
+        $html .= 'onclick="return confirm(\'This will replace ALL existing quotes in the bank. Continue?\')">';
+        $html .= 'Generate Quote Bank</button>';
+        $html .= '</div>';
+
+        if ($totalQuotes > 0) {
+            // Stats
+            $html .= '<div class="sqb-stats">';
+            $html .= 'Total: <strong>' . $totalQuotes . '</strong> quotes';
+            $html .= ' &nbsp;|&nbsp; Pending: <strong>' . $pendingCount . '</strong>';
+            $html .= ' &nbsp;|&nbsp; Posted: <strong>' . $postedCount . '</strong>';
+            $firstDate = $bank[0]['date'] ?? '?';
+            $lastDate = $bank[$totalQuotes - 1]['date'] ?? '?';
+            $html .= ' &nbsp;|&nbsp; Range: ' . $firstDate . ' to ' . $lastDate;
+            $html .= '</div>';
+
+            // Hidden fields for replace/edit actions
+            $html .= '<input type="hidden" name="smp_replace_quote_idx" id="sqb_replace_idx" value="">';
+            $html .= '<input type="hidden" name="smp_edit_quote_idx" id="sqb_edit_idx" value="">';
+            $html .= '<input type="hidden" name="smp_edit_quote_text" id="sqb_edit_text" value="">';
+
+            // Quote table
+            $html .= '<div style="max-height:600px;overflow-y:auto;border:1px solid #e0e0e0;border-radius:4px;">';
+            $html .= '<table class="sqb-table">';
+            $html .= '<thead><tr>';
+            $html .= '<th style="width:30px">#</th>';
+            $html .= '<th style="width:90px">Date</th>';
+            $html .= '<th>Quote</th>';
+            $html .= '<th style="width:60px">Status</th>';
+            $html .= '<th style="width:120px">Actions</th>';
+            $html .= '</tr></thead><tbody>';
+
+            foreach ($bank as $idx => $entry) {
+                $date = $entry['date'];
+                $isToday = ($date === $today);
+                $isPast = ($date < $today);
+                $isPosted = ($entry['status'] === 'posted');
+
+                $rowClass = '';
+                if ($isToday) $rowClass = 'sqb-today';
+                elseif ($isPosted) $rowClass = 'sqb-posted';
+                elseif ($isPast) $rowClass = 'sqb-past';
+
+                $html .= '<tr class="' . $rowClass . '" id="sqb-row-' . $idx . '">';
+                $html .= '<td>' . ($idx + 1) . '</td>';
+
+                $dayName = date('D', strtotime($date));
+                $html .= '<td>' . htmlspecialchars($date, ENT_QUOTES, 'UTF-8') . '<br><small style="color:#888">' . $dayName . '</small></td>';
+
+                $quoteHtml = htmlspecialchars(mb_strimwidth($entry['quote'], 0, 200, '...'), ENT_QUOTES, 'UTF-8');
+                $quoteFull = htmlspecialchars($entry['quote'], ENT_QUOTES, 'UTF-8');
+                $html .= '<td class="sqb-quote-text">';
+                $html .= '<span class="sqb-quote-display-' . $idx . '" title="' . $quoteFull . '">' . $quoteHtml . '</span>';
+                $html .= '<textarea class="sqb-edit-area" id="sqb-edit-area-' . $idx . '">' . $quoteFull . '</textarea>';
+                $html .= '</td>';
+
+                // Status badge
+                $html .= '<td>';
+                if ($isToday) {
+                    $html .= '<span class="sqb-badge sqb-badge-today">Today</span>';
+                } elseif ($isPosted) {
+                    $html .= '<span class="sqb-badge sqb-badge-posted">Posted</span>';
+                } else {
+                    $html .= '<span class="sqb-badge sqb-badge-pending">Pending</span>';
+                }
+                $html .= '</td>';
+
+                // Actions
+                $html .= '<td>';
+                $html .= '<button type="submit" name="smp_replace_quote" value="1" class="sqb-btn sqb-btn-replace" ';
+                $html .= 'onclick="document.getElementById(\'sqb_replace_idx\').value=' . $idx . ';return confirm(\'Replace this quote with a new AI-generated one?\')" ';
+                $html .= 'title="Replace with new AI quote">Replace</button> ';
+                $html .= '<button type="button" class="sqb-btn sqb-btn-edit" onclick="sqbToggleEdit(' . $idx . ')" title="Edit manually">Edit</button>';
+                $html .= '</td>';
+                $html .= '</tr>';
+            }
+
+            $html .= '</tbody></table>';
+            $html .= '</div>';
+
+            // JavaScript
+            $html .= '<script>
+            function sqbToggleEdit(idx) {
+                var area = document.getElementById("sqb-edit-area-" + idx);
+                var display = document.querySelector(".sqb-quote-display-" + idx);
+                if (area.style.display === "none" || area.style.display === "") {
+                    area.style.display = "block";
+                    display.style.display = "none";
+                    area.focus();
+                    // Add save on blur
+                    area.onblur = function() {
+                        var newText = area.value.trim();
+                        if (newText && newText !== display.textContent) {
+                            document.getElementById("sqb_edit_idx").value = idx;
+                            document.getElementById("sqb_edit_text").value = newText;
+                            // Submit the form
+                            var btn = document.createElement("input");
+                            btn.type = "hidden";
+                            btn.name = "smp_edit_quote";
+                            btn.value = "1";
+                            area.closest("form").appendChild(btn);
+                            area.closest("form").submit();
+                        } else {
+                            area.style.display = "none";
+                            display.style.display = "";
+                        }
+                    };
+                } else {
+                    area.style.display = "none";
+                    display.style.display = "";
+                }
+            }
+            </script>';
+        } else {
+            $html .= '<p style="color:#999;font-size:13px;">No quotes in the bank. Click "Generate Quote Bank" to create quotes scheduled for the next 100 days.</p>';
+        }
+
+        $html .= '</div>';
+        return $html;
     }
 }

@@ -163,22 +163,31 @@ class SmpDailyPoster
             return;
         }
 
-        // Generate a motivational quote using OpenAI
-        $customPrompt = qa_opt(SmpConstants::OPT_QUOTE_PROMPT);
-        if (empty($customPrompt)) {
-            $customPrompt = 'Generate a unique, inspiring motivational quote suitable for students preparing for competitive exams. '
-                . 'Include the quote and attribute it to a famous person or mark it as anonymous. '
-                . 'Format it nicely for social media with emojis. Add #QuoteOfTheDay #Motivation hashtags.';
+        // Try quote bank first — use pre-generated quote for today
+        $today = date('Y-m-d');
+        $quote = $poster->getTodayQuote();
+
+        if ($quote) {
+            // Mark as posted in the bank
+            $poster->markQuotePosted($today);
+        } else {
+            // Fallback: generate on the fly via OpenAI
+            $customPrompt = qa_opt(SmpConstants::OPT_QUOTE_PROMPT);
+            if (empty($customPrompt)) {
+                $customPrompt = 'Generate a unique, inspiring motivational quote suitable for students preparing for competitive exams. '
+                    . 'Include the quote and attribute it to a famous person or mark it as anonymous. '
+                    . 'Format it nicely for social media with emojis. Add #QuoteOfTheDay #Motivation hashtags.';
+            }
+
+            $todayStr = date('l, F j, Y');
+            $quote = $poster->openaiGenerateMessage(
+                'Generate a motivational Quote of the Day for ' . $todayStr,
+                $customPrompt
+            );
         }
 
-        $today = date('l, F j, Y');
-        $quote = $poster->openaiGenerateMessage(
-            'Generate a motivational Quote of the Day for ' . $today,
-            $customPrompt
-        );
-
         if (empty($quote)) {
-            $poster->reportFailure('Quote of the Day: OpenAI failed to generate a quote');
+            $poster->reportFailure('Quote of the Day: Failed to get a quote (bank empty and OpenAI failed)');
             return;
         }
 
