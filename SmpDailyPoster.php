@@ -200,7 +200,7 @@ class SmpDailyPoster
         if ($needsImage) {
             require_once $this->directory . 'SmpImageGenerator.php';
             $imageGen = new SmpImageGenerator();
-            $imageUrl = $imageGen->generateFromText($quote, 'Quote of the Day');
+            $imageUrl = $imageGen->generateQuoteImage($quote);
         }
 
         $results = $poster->postToAll(SmpConstants::CONTENT_QUOTE, $quote, $imageUrl, ['title' => 'Quote of the Day']);
