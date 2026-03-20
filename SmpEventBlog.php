@@ -27,7 +27,14 @@ class SmpEventBlog
         // Get auto-posting accounts + manually selected accounts
         $autoAccounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_BLOG);
         $manualAccounts = $poster->getManualShareAccounts(SmpConstants::CONTENT_BLOG);
-        if (empty($autoAccounts) && empty($manualAccounts)) {
+
+        // Get user's personal accounts (if configured)
+        $userAccounts = [];
+        if ($userid) {
+            $userAccounts = $poster->getUserAccountsForPosting((int)$userid);
+        }
+
+        if (empty($autoAccounts) && empty($manualAccounts) && empty($userAccounts)) {
             return;
         }
 
@@ -51,7 +58,7 @@ class SmpEventBlog
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
-        $allAccounts = $autoAccounts + $manualAccounts;
+        $allAccounts = $autoAccounts + $manualAccounts + $userAccounts;
         $accountPlatforms = array_column($allAccounts, '_platform');
         $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
@@ -63,7 +70,7 @@ class SmpEventBlog
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl, ['title' => $title]);
+        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts]);
 
         // Report failures
         foreach ($results as $accountId => $result) {

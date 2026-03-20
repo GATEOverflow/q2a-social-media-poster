@@ -26,7 +26,14 @@ class SmpEventJob
 
         // Check if any accounts are configured for jobs
         $accounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_JOB);
-        if (empty($accounts)) {
+
+        // Get user's personal accounts (if configured)
+        $userAccounts = [];
+        if ($userid) {
+            $userAccounts = $poster->getUserAccountsForPosting((int)$userid);
+        }
+
+        if (empty($accounts) && empty($userAccounts)) {
             return;
         }
 
@@ -46,7 +53,8 @@ class SmpEventJob
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
-        $accountPlatforms = array_column($accounts, '_platform');
+        $allAccounts = $accounts + $userAccounts;
+        $accountPlatforms = array_column($allAccounts, '_platform');
         $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
                 && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));
@@ -57,7 +65,7 @@ class SmpEventJob
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl, ['title' => $title]);
+        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $userAccounts]);
 
         // Report failures
         foreach ($results as $accountId => $result) {

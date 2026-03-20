@@ -1629,4 +1629,92 @@ class SmpPoster
 
         return $results;
     }
+
+    // ==================== Per-User Account Methods ====================
+
+    private const USER_META_ACCOUNTS_PREFIX = 'smp_accounts_';
+    private const USER_META_SHARING_ENABLED = 'smp_sharing_enabled';
+
+    /**
+     * Get a user's social media accounts for a specific platform.
+     */
+    public function getUserAccounts(int $userId, string $platform): array
+    {
+        $metaKey = self::USER_META_ACCOUNTS_PREFIX . $platform;
+        $json = qa_db_read_one_value(qa_db_query_sub(
+            "SELECT content FROM ^usermetas WHERE userid = # AND title = $",
+            $userId, $metaKey
+        ), true);
+
+        if (empty($json)) {
+            return [];
+        }
+        $accounts = json_decode($json, true);
+        return is_array($accounts) ? $accounts : [];
+    }
+
+    /**
+     * Save a user's social media accounts for a specific platform.
+     */
+    public function saveUserAccounts(int $userId, string $platform, array $accounts): void
+    {
+        $metaKey = self::USER_META_ACCOUNTS_PREFIX . $platform;
+        $json = json_encode(array_values($accounts));
+
+        qa_db_query_sub(
+            "INSERT INTO ^usermetas (userid, title, content) VALUES (#, $, $) ON DUPLICATE KEY UPDATE content = $",
+            $userId, $metaKey, $json, $json
+        );
+    }
+
+    /**
+     * Check if a user has social sharing enabled.
+     */
+    public function getUserSharingEnabled(int $userId): bool
+    {
+        $val = qa_db_read_one_value(qa_db_query_sub(
+            "SELECT content FROM ^usermetas WHERE userid = # AND title = $",
+            $userId, self::USER_META_SHARING_ENABLED
+        ), true);
+
+        return $val === '1';
+    }
+
+    /**
+     * Set user's sharing enabled/disabled.
+     */
+    public function setUserSharingEnabled(int $userId, bool $enabled): void
+    {
+        $val = $enabled ? '1' : '0';
+        qa_db_query_sub(
+            "INSERT INTO ^usermetas (userid, title, content) VALUES (#, $, $) ON DUPLICATE KEY UPDATE content = $",
+            $userId, self::USER_META_SHARING_ENABLED, $val, $val
+        );
+    }
+
+    /**
+     * Get ALL enabled accounts for a user across all platforms.
+     * Returns array keyed by account ID with _platform set.
+     */
+    public function getUserAccountsForPosting(int $userId): array
+    {
+        if (!$this->getUserSharingEnabled($userId)) {
+            return [];
+        }
+
+        $result = [];
+        $platforms = SmpConstants::getPlatforms();
+
+        foreach (array_keys($platforms) as $platform) {
+            $accounts = $this->getUserAccounts($userId, $platform);
+            foreach ($accounts as $account) {
+                if (!empty($account['enabled']) && !empty($account['id'])) {
+                    $account['_platform'] = $platform;
+                    $result[$account['id']] = $account;
+                }
+            }
+        }
+
+        return $result;
+    }
 }

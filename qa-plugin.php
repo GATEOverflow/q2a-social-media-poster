@@ -25,3 +25,6 @@ qa_register_plugin_module('page', 'SmpOAuthCallback.php', 'SmpOAuthCallback', 'S
 
 // Register layer for manual share checkboxes on post pages
 qa_register_plugin_layer('SmpLayer.php', 'Social Media Poster Layer');
+
+// Register layer for user profile Social Sharing tab
+qa_register_plugin_layer('SmpUserPage.php', 'Social Media User Profile Layer');

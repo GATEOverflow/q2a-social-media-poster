@@ -30,7 +30,14 @@ class SmpEventQuestion
         // Get auto-posting accounts + manually selected accounts
         $autoAccounts = $poster->getAccountsForPosting(SmpConstants::CONTENT_QUESTION, $categoryId);
         $manualAccounts = $poster->getManualShareAccounts(SmpConstants::CONTENT_QUESTION, $categoryId);
-        if (empty($autoAccounts) && empty($manualAccounts)) {
+
+        // Get user's personal accounts (if configured)
+        $userAccounts = [];
+        if ($userid) {
+            $userAccounts = $poster->getUserAccountsForPosting((int)$userid);
+        }
+
+        if (empty($autoAccounts) && empty($manualAccounts) && empty($userAccounts)) {
             return;
         }
 
@@ -51,7 +58,7 @@ class SmpEventQuestion
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
-        $allAccounts = $autoAccounts + $manualAccounts;
+        $allAccounts = $autoAccounts + $manualAccounts + $userAccounts;
         $accountPlatforms = array_column($allAccounts, '_platform');
         $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
             || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
@@ -62,8 +69,8 @@ class SmpEventQuestion
             $imageUrl = $imageGen->generateFromText($content, $title, $postId);
         }
 
-        // Post to all enabled accounts (with category routing)
-        $extra = ['categoryid' => $categoryId, 'title' => $title, '_manual_accounts' => $manualAccounts];
+        // Post to all enabled accounts (with category routing + user accounts)
+        $extra = ['categoryid' => $categoryId, 'title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts];
         $results = $poster->postToAll(SmpConstants::CONTENT_QUESTION, $message, $imageUrl, $extra);
 
         // Report any failures
