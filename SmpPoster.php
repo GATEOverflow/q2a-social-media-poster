@@ -1248,6 +1248,85 @@ class SmpPoster
     }
 
     /**
+     * Send a posting summary email (success + failures) to the Q2A admin.
+     */
+    public function reportPostingSummary(string $contentLabel, array $results, string $extraInfo = ''): void
+    {
+        if (!function_exists('qa_send_email')) {
+            return;
+        }
+
+        $email = self::getAdminEmail();
+        if (empty($email)) {
+            return;
+        }
+
+        $successList = [];
+        $failList = [];
+        foreach ($results as $accountId => $result) {
+            $accountName = $result['account_name'] ?? $accountId;
+            $platform = $result['platform'] ?? 'unknown';
+            $label = $platform . ' (' . $accountName . ')';
+            if (!empty($result['success'])) {
+                $successList[] = $label;
+            } else {
+                $failList[] = $label . ' — ' . ($result['error'] ?? 'Unknown error');
+            }
+        }
+
+        $totalSuccess = count($successList);
+        $totalFail = count($failList);
+        $total = $totalSuccess + $totalFail;
+
+        if ($total === 0) {
+            return;
+        }
+
+        $allOk = ($totalFail === 0);
+        $statusTag = $allOk ? 'SUCCESS' : ($totalSuccess > 0 ? 'PARTIAL' : 'FAILED');
+        $subject = '[SMP] ' . $statusTag . ': ' . $contentLabel;
+
+        $body = 'Social Media Poster — ' . $contentLabel . "\n"
+            . str_repeat('=', 50) . "\n\n"
+            . 'Time: ' . date('Y-m-d H:i:s') . "\n"
+            . 'Site: ' . qa_opt('site_url') . "\n\n";
+
+        if (!empty($extraInfo)) {
+            $body .= $extraInfo . "\n\n";
+        }
+
+        $body .= 'Results: ' . $totalSuccess . '/' . $total . ' succeeded' . "\n\n";
+
+        if (!empty($successList)) {
+            $body .= 'Successful posts:' . "\n";
+            foreach ($successList as $s) {
+                $body .= '  [OK] ' . $s . "\n";
+            }
+            $body .= "\n";
+        }
+
+        if (!empty($failList)) {
+            $body .= 'Failed posts:' . "\n";
+            foreach ($failList as $f) {
+                $body .= '  [FAIL] ' . $f . "\n";
+            }
+            $body .= "\n";
+        }
+
+        qa_send_email([
+            'fromemail' => qa_opt('from_email'),
+            'fromname' => qa_opt('site_name'),
+            'replytoemail' => qa_opt('from_email'),
+            'replytoname' => qa_opt('site_name') . ' (Do Not Reply)',
+            'toemail' => $email,
+            'toname' => 'Admin',
+            'subject' => $subject,
+            'body' => $body,
+            'html' => false,
+        ]);
+    }
+
+    /**
      * Send a token expiry warning email to the Q2A admin.
      */
     public function sendTokenExpiryWarning(string $platform, string $accountName, string $expiryDate, int $daysLeft): void

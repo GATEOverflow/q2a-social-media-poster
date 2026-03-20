@@ -62,7 +62,7 @@ class SmpEventExam
         if ($needsImage) {
             require_once $this->directory . 'SmpImageGenerator.php';
             $imageGen = new SmpImageGenerator();
-            $imageUrl = $imageGen->generateFromText($title, 'New Exam', $postId);
+            $imageUrl = $imageGen->generateExamImage($title, $postId);
         }
 
         // Post to all enabled accounts

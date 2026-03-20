@@ -61,7 +61,7 @@ class SmpEventJob
         if ($needsImage) {
             require_once $this->directory . 'SmpImageGenerator.php';
             $imageGen = new SmpImageGenerator();
-            $imageUrl = $imageGen->generateFromText($title, 'New Job Opening', $postId);
+            $imageUrl = $imageGen->generateJobImage($title, $postId);
         }
 
         // Post to all enabled accounts

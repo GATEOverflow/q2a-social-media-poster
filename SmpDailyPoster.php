@@ -25,10 +25,12 @@ class SmpDailyPoster
         if (qa_opt(SmpConstants::OPT_QOTD_ENABLED)) {
             $qotdHour = (int)(qa_opt(SmpConstants::OPT_QOTD_HOUR) ?: 9);
             $qotdLastRun = qa_opt(SmpConstants::OPT_QOTD_LAST_RUN);
+            $qotdLastDate = substr($qotdLastRun, 0, 10); // extract date part from datetime
 
-            if ($currentHour >= $qotdHour && $qotdLastRun !== $today) {
-                qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, $today);
+            if ($currentHour >= $qotdHour && $qotdLastDate !== $today) {
+                qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, $today); // lock immediately to prevent double-run
                 $this->postQuestionOfTheDay();
+                qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, date('Y-m-d H:i:s')); // update with actual post time
             }
         }
 
@@ -36,10 +38,12 @@ class SmpDailyPoster
         if (qa_opt(SmpConstants::OPT_QUOTE_ENABLED)) {
             $quoteHour = (int)(qa_opt(SmpConstants::OPT_QUOTE_HOUR) ?: 8);
             $quoteLastRun = qa_opt(SmpConstants::OPT_QUOTE_LAST_RUN);
+            $quoteLastDate = substr($quoteLastRun, 0, 10);
 
-            if ($currentHour >= $quoteHour && $quoteLastRun !== $today) {
+            if ($currentHour >= $quoteHour && $quoteLastDate !== $today) {
                 qa_opt(SmpConstants::OPT_QUOTE_LAST_RUN, $today);
                 $this->postQuoteOfTheDay();
+                qa_opt(SmpConstants::OPT_QUOTE_LAST_RUN, date('Y-m-d H:i:s'));
             }
         }
 
@@ -128,24 +132,14 @@ class SmpDailyPoster
 
         $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, ['title' => $title]);
 
-        foreach ($results as $accountId => $result) {
-            if (empty($result['success'])) {
-                $accountName = $result['account_name'] ?? $accountId;
-                $platform = $result['platform'] ?? 'unknown';
-                $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
-                $videoUrl = $result['video_url'] ?? 'none';
-                $poster->reportFailure(
-                    'QOTD post failed on ' . $platform . ' (' . $accountName . ')',
-                    'Post ID: ' . $postId
-                    . "\nTitle: " . $title
-                    . "\nImage URL: " . $usedImageUrl
-                    . "\nVideo URL: " . $videoUrl
-                    . "\nError: " . ($result['error'] ?? 'Unknown')
-                    . "\n\n--- Message ---\n" . $message
-                    . "\n\n--- Content ---\n" . ($content ?? '')
-                );
-            }
-        }
+        $poster->reportPostingSummary(
+            'Question of the Day',
+            $results,
+            'Post ID: ' . $postId
+            . "\nTitle: " . $title
+            . "\nImage URL: " . ($imageUrl ?? 'none')
+            . "\n\n--- Message ---\n" . mb_substr($message, 0, 500)
+        );
     }
 
     /**
@@ -205,21 +199,12 @@ class SmpDailyPoster
 
         $results = $poster->postToAll(SmpConstants::CONTENT_QUOTE, $quote, $imageUrl, ['title' => 'Quote of the Day']);
 
-        foreach ($results as $accountId => $result) {
-            if (empty($result['success'])) {
-                $accountName = $result['account_name'] ?? $accountId;
-                $platform = $result['platform'] ?? 'unknown';
-                $usedImageUrl = $result['image_url'] ?? $imageUrl ?? 'none';
-                $videoUrl = $result['video_url'] ?? 'none';
-                $poster->reportFailure(
-                    'Quote of the Day post failed on ' . $platform . ' (' . $accountName . ')',
-                    'Image URL: ' . $usedImageUrl
-                    . "\nVideo URL: " . $videoUrl
-                    . "\nError: " . ($result['error'] ?? 'Unknown')
-                    . "\n\n--- Message ---\n" . $quote
-                );
-            }
-        }
+        $poster->reportPostingSummary(
+            'Quote of the Day',
+            $results,
+            'Image URL: ' . ($imageUrl ?? 'none')
+            . "\n\n--- Quote ---\n" . mb_substr($quote, 0, 500)
+        );
     }
 
     /**

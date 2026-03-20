@@ -371,57 +371,7 @@ class SmpImageGenerator
         }
 
         // --- Bottom branding strip ---
-        $brandY = $h - 90;
-
-        // Subtle separator line
-        $sepCol = imagecolorallocatealpha($img, 255, 255, 255, 100);
-        imageline($img, $padding, $brandY, $w - $padding, $brandY, $sepCol);
-        $brandY += 20;
-
-        $siteName = qa_opt('site_title') ?: qa_opt('site_name') ?: '';
-        $brandFontSize = 18;
-        $brandX = $padding;
-
-        // Draw logo if available
-        if ($this->logoUrl && file_exists($this->logoUrl)) {
-            $logoInfo = getimagesize($this->logoUrl);
-            if ($logoInfo) {
-                $logo = $this->loadImage($this->logoUrl, $logoInfo[2]);
-                if ($logo) {
-                    $logoW = $logoInfo[0];
-                    $logoH = $logoInfo[1];
-                    $maxLogoH = 40;
-                    if ($logoH > $maxLogoH) {
-                        $ratio = $maxLogoH / $logoH;
-                        $logoW = (int)($logoW * $ratio);
-                        $logoH = $maxLogoH;
-                    }
-                    // Center logo + site name together
-                    $siteNameBox = imagettfbbox($brandFontSize, 0, $fontBold, $siteName);
-                    $siteNameW = !empty($siteName) ? abs($siteNameBox[2] - $siteNameBox[0]) : 0;
-                    $gap = !empty($siteName) ? 15 : 0;
-                    $totalBrandW = $logoW + $gap + $siteNameW;
-                    $brandX = (int)(($w - $totalBrandW) / 2);
-
-                    $logoY = $brandY + (int)(($brandFontSize - $logoH) / 2);
-                    imagecopyresampled($img, $logo, $brandX, $logoY, 0, 0, $logoW, $logoH, $logoInfo[0], $logoInfo[1]);
-                    imagedestroy($logo);
-                    $brandX += $logoW + $gap;
-                }
-            }
-        } else {
-            // Center site name only
-            if (!empty($siteName)) {
-                $siteBox = imagettfbbox($brandFontSize, 0, $fontBold, $siteName);
-                $siteNameW = abs($siteBox[2] - $siteBox[0]);
-                $brandX = (int)(($w - $siteNameW) / 2);
-            }
-        }
-
-        // Draw site name
-        if (!empty($siteName)) {
-            imagettftext($img, $brandFontSize, 0, $brandX, $brandY + $brandFontSize, $white, $fontBold, $siteName);
-        }
+        $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
 
         // --- Hashtags in small text at very bottom ---
         if (!empty($hashtags)) {
@@ -435,12 +385,332 @@ class SmpImageGenerator
         }
 
         // --- Save image ---
+        return $this->saveImage($img, 'smp_quote_' . date('Ymd') . '_' . uniqid());
+    }
+
+    /**
+     * Generate a visually rich exam announcement image for Instagram.
+     * Features: gradient background (teal-blue), exam icon, bold title, site branding.
+     *
+     * @param string $title Exam title
+     * @param int|null $postId Post ID for unique filename
+     * @return string|null Public URL of the generated image, or null on failure
+     */
+    public function generateExamImage(string $title, ?int $postId = null): ?string
+    {
+        if (!extension_loaded('gd')) {
+            return null;
+        }
+
+        $w = $this->width;
+        $h = $this->height;
+
+        $img = imagecreatetruecolor($w, $h);
+        if (!$img) {
+            return null;
+        }
+
+        // --- Gradient background (dark teal → deep blue) ---
+        $topR = 0;   $topG = 77;  $topB = 64;    // #004d40
+        $botR = 13;  $botG = 71;  $botB = 161;    // #0d47a1
+        for ($y = 0; $y < $h; $y++) {
+            $ratio = $y / max($h - 1, 1);
+            $r = (int)($topR + ($botR - $topR) * $ratio);
+            $g = (int)($topG + ($botG - $topG) * $ratio);
+            $b = (int)($topB + ($botB - $botB) * $ratio);
+            $lineCol = imagecolorallocate($img, $r, $g, $b);
+            imageline($img, 0, $y, $w - 1, $y, $lineCol);
+        }
+
+        // --- Decorative geometric elements ---
+        $circleCol = imagecolorallocatealpha($img, 255, 255, 255, 118);
+        imagefilledellipse($img, (int)($w * 0.90), (int)($h * 0.10), 250, 250, $circleCol);
+        imagefilledellipse($img, (int)($w * 0.05), (int)($h * 0.90), 180, 180, $circleCol);
+
+        // Accent bar at top
+        $accentCol = imagecolorallocate($img, 0, 200, 170); // teal accent
+        imagefilledrectangle($img, 0, 0, $w - 1, 8, $accentCol);
+
+        $padding = 80;
+        $innerW = $w - 2 * $padding;
+        $yOffset = 60;
+
+        // --- Fonts ---
+        $fontRegular = $this->fontPath;
+        $fontBold = str_replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf', $this->fontPath);
+        if (!file_exists($fontBold)) {
+            $fontBold = $fontRegular;
+        }
+
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $lightGray = imagecolorallocate($img, 180, 200, 220);
+        $accent = imagecolorallocate($img, 0, 230, 190); // bright teal
+
+        // --- Exam icon (pencil/paper symbol using text) ---
+        $iconSize = 60;
+        $iconText = "\xe2\x9c\x8f"; // pencil ✏
+        $iconBox = imagettfbbox($iconSize, 0, $fontRegular, $iconText);
+        $iconW = abs($iconBox[2] - $iconBox[0]);
+        imagettftext($img, $iconSize, 0, (int)(($w - $iconW) / 2), $yOffset + $iconSize, $accent, $fontRegular, $iconText);
+        $yOffset += $iconSize + 30;
+
+        // --- "NEW EXAM" badge ---
+        $badgeSize = 20;
+        $badgeText = 'NEW EXAM';
+        $badgeBox = imagettfbbox($badgeSize, 0, $fontBold, $badgeText);
+        $badgeW = abs($badgeBox[2] - $badgeBox[0]);
+        $badgeH = abs($badgeBox[7] - $badgeBox[1]);
+        $badgePadX = 25;
+        $badgePadY = 12;
+        $badgeX = (int)(($w - $badgeW - 2 * $badgePadX) / 2);
+        // Badge background pill
+        $pillCol = imagecolorallocatealpha($img, 0, 200, 170, 40);
+        imagefilledrectangle($img, $badgeX, $yOffset, $badgeX + $badgeW + 2 * $badgePadX, $yOffset + $badgeH + 2 * $badgePadY, $pillCol);
+        imagettftext($img, $badgeSize, 0, $badgeX + $badgePadX, $yOffset + $badgePadY + $badgeSize, $white, $fontBold, $badgeText);
+        $yOffset += $badgeH + 2 * $badgePadY + 40;
+
+        // --- Exam title (centered, large, bold, white) ---
+        $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
+        $titleSize = $this->fontSize + 8;
+        $titleLen = mb_strlen($title);
+        if ($titleLen > 100) {
+            $titleSize = max(24, $this->fontSize);
+        } elseif ($titleLen > 60) {
+            $titleSize = $this->fontSize + 4;
+        }
+
+        $wrappedTitle = $this->wrapText($title, $titleSize, $innerW);
+        $titleLineH = $titleSize + 14;
+        $totalTitleH = count($wrappedTitle) * $titleLineH;
+
+        // Center title vertically in available space
+        $bottomReserved = 180;
+        $availH = $h - $yOffset - $bottomReserved;
+        if ($totalTitleH < $availH) {
+            $yOffset += (int)(($availH - $totalTitleH) / 2);
+        }
+
+        foreach ($wrappedTitle as $line) {
+            if ($yOffset > $h - $bottomReserved) break;
+            $bbox = imagettfbbox($titleSize, 0, $fontBold, $line);
+            $lineW = abs($bbox[2] - $bbox[0]);
+            $lineX = ($w - $lineW) / 2;
+            imagettftext($img, $titleSize, 0, (int)$lineX, $yOffset + $titleSize, $white, $fontBold, $line);
+            $yOffset += $titleLineH;
+        }
+
+        // --- Decorative accent line ---
+        $lineY = $h - $bottomReserved + 20;
+        $lineHalfW = 50;
+        imageline($img, (int)(($w - $lineHalfW * 2) / 2), $lineY, (int)(($w + $lineHalfW * 2) / 2), $lineY, $accent);
+
+        // --- Bottom branding ---
+        $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
+
+        // --- Save ---
+        return $this->saveImage($img, 'smp_exam_' . ($postId ?: uniqid()) . '_' . time());
+    }
+
+    /**
+     * Generate a visually rich job posting image for Instagram.
+     * Features: gradient background (warm orange-red), briefcase icon, bold title, site branding.
+     *
+     * @param string $title Job title
+     * @param int|null $postId Post ID for unique filename
+     * @return string|null Public URL of the generated image, or null on failure
+     */
+    public function generateJobImage(string $title, ?int $postId = null): ?string
+    {
+        if (!extension_loaded('gd')) {
+            return null;
+        }
+
+        $w = $this->width;
+        $h = $this->height;
+
+        $img = imagecreatetruecolor($w, $h);
+        if (!$img) {
+            return null;
+        }
+
+        // --- Gradient background (warm dark red → deep indigo) ---
+        $topR = 136; $topG = 14;  $topB = 79;    // #880e4f
+        $botR = 49;  $botG = 27;  $botB = 146;    // #311b92
+        for ($y = 0; $y < $h; $y++) {
+            $ratio = $y / max($h - 1, 1);
+            $r = (int)($topR + ($botR - $topR) * $ratio);
+            $g = (int)($topG + ($botG - $topG) * $ratio);
+            $b = (int)($topB + ($botB - $topB) * $ratio);
+            $lineCol = imagecolorallocate($img, $r, $g, $b);
+            imageline($img, 0, $y, $w - 1, $y, $lineCol);
+        }
+
+        // --- Decorative elements ---
+        $circleCol = imagecolorallocatealpha($img, 255, 255, 255, 118);
+        imagefilledellipse($img, (int)($w * 0.88), (int)($h * 0.12), 280, 280, $circleCol);
+        imagefilledellipse($img, (int)($w * 0.08), (int)($h * 0.85), 200, 200, $circleCol);
+
+        // Accent bar at top
+        $accentCol = imagecolorallocate($img, 255, 167, 38); // orange accent
+        imagefilledrectangle($img, 0, 0, $w - 1, 8, $accentCol);
+
+        $padding = 80;
+        $innerW = $w - 2 * $padding;
+        $yOffset = 60;
+
+        // --- Fonts ---
+        $fontRegular = $this->fontPath;
+        $fontBold = str_replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf', $this->fontPath);
+        if (!file_exists($fontBold)) {
+            $fontBold = $fontRegular;
+        }
+
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $lightGray = imagecolorallocate($img, 220, 200, 220);
+        $accent = imagecolorallocate($img, 255, 183, 77); // warm amber
+
+        // --- Briefcase icon ---
+        $iconSize = 60;
+        $iconText = "\xf0\x9f\x92\xbc"; // briefcase 💼
+        // Fallback to a simple text icon if emoji not supported
+        $iconBox = @imagettfbbox($iconSize, 0, $fontRegular, $iconText);
+        if ($iconBox === false) {
+            $iconText = "\xe2\x98\x85"; // star ★
+            $iconBox = imagettfbbox($iconSize, 0, $fontRegular, $iconText);
+        }
+        $iconW = abs($iconBox[2] - $iconBox[0]);
+        imagettftext($img, $iconSize, 0, (int)(($w - $iconW) / 2), $yOffset + $iconSize, $accent, $fontRegular, $iconText);
+        $yOffset += $iconSize + 30;
+
+        // --- "JOB OPENING" badge ---
+        $badgeSize = 20;
+        $badgeText = 'JOB OPENING';
+        $badgeBox = imagettfbbox($badgeSize, 0, $fontBold, $badgeText);
+        $badgeW = abs($badgeBox[2] - $badgeBox[0]);
+        $badgeH = abs($badgeBox[7] - $badgeBox[1]);
+        $badgePadX = 25;
+        $badgePadY = 12;
+        $badgeX = (int)(($w - $badgeW - 2 * $badgePadX) / 2);
+        $pillCol = imagecolorallocatealpha($img, 255, 167, 38, 40);
+        imagefilledrectangle($img, $badgeX, $yOffset, $badgeX + $badgeW + 2 * $badgePadX, $yOffset + $badgeH + 2 * $badgePadY, $pillCol);
+        imagettftext($img, $badgeSize, 0, $badgeX + $badgePadX, $yOffset + $badgePadY + $badgeSize, $white, $fontBold, $badgeText);
+        $yOffset += $badgeH + 2 * $badgePadY + 40;
+
+        // --- Job title (centered, large, bold, white) ---
+        $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
+        $titleSize = $this->fontSize + 8;
+        $titleLen = mb_strlen($title);
+        if ($titleLen > 100) {
+            $titleSize = max(24, $this->fontSize);
+        } elseif ($titleLen > 60) {
+            $titleSize = $this->fontSize + 4;
+        }
+
+        $wrappedTitle = $this->wrapText($title, $titleSize, $innerW);
+        $titleLineH = $titleSize + 14;
+        $totalTitleH = count($wrappedTitle) * $titleLineH;
+
+        // Center title vertically
+        $bottomReserved = 180;
+        $availH = $h - $yOffset - $bottomReserved;
+        if ($totalTitleH < $availH) {
+            $yOffset += (int)(($availH - $totalTitleH) / 2);
+        }
+
+        foreach ($wrappedTitle as $line) {
+            if ($yOffset > $h - $bottomReserved) break;
+            $bbox = imagettfbbox($titleSize, 0, $fontBold, $line);
+            $lineW = abs($bbox[2] - $bbox[0]);
+            $lineX = ($w - $lineW) / 2;
+            imagettftext($img, $titleSize, 0, (int)$lineX, $yOffset + $titleSize, $white, $fontBold, $line);
+            $yOffset += $titleLineH;
+        }
+
+        // --- "APPLY NOW" call to action ---
+        $ctaY = $h - $bottomReserved + 15;
+        $ctaSize = 18;
+        $ctaText = 'APPLY NOW';
+        $ctaBox = imagettfbbox($ctaSize, 0, $fontBold, $ctaText);
+        $ctaW = abs($ctaBox[2] - $ctaBox[0]);
+        $ctaH = abs($ctaBox[7] - $ctaBox[1]);
+        $ctaPadX = 30;
+        $ctaPadY = 10;
+        $ctaX = (int)(($w - $ctaW - 2 * $ctaPadX) / 2);
+        // CTA button background
+        imagefilledrectangle($img, $ctaX, $ctaY, $ctaX + $ctaW + 2 * $ctaPadX, $ctaY + $ctaH + 2 * $ctaPadY, $accentCol);
+        $ctaTextCol = imagecolorallocate($img, 50, 20, 60);
+        imagettftext($img, $ctaSize, 0, $ctaX + $ctaPadX, $ctaY + $ctaPadY + $ctaSize, $ctaTextCol, $fontBold, $ctaText);
+
+        // --- Bottom branding ---
+        $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
+
+        // --- Save ---
+        return $this->saveImage($img, 'smp_job_' . ($postId ?: uniqid()) . '_' . time());
+    }
+
+    /**
+     * Draw site branding (logo + site name) centered at the bottom of an image.
+     */
+    private function drawBranding($img, int $w, int $h, int $padding, string $fontBold, $white): void
+    {
+        $brandY = $h - 90;
+        $sepCol = imagecolorallocatealpha($img, 255, 255, 255, 100);
+        imageline($img, $padding, $brandY, $w - $padding, $brandY, $sepCol);
+        $brandY += 20;
+
+        $siteName = qa_opt('site_title') ?: qa_opt('site_name') ?: '';
+        $brandFontSize = 18;
+        $brandX = $padding;
+
+        if ($this->logoUrl && file_exists($this->logoUrl)) {
+            $logoInfo = getimagesize($this->logoUrl);
+            if ($logoInfo) {
+                $logo = $this->loadImage($this->logoUrl, $logoInfo[2]);
+                if ($logo) {
+                    $logoW = $logoInfo[0];
+                    $logoH = $logoInfo[1];
+                    $maxLogoH = 40;
+                    if ($logoH > $maxLogoH) {
+                        $ratio = $maxLogoH / $logoH;
+                        $logoW = (int)($logoW * $ratio);
+                        $logoH = $maxLogoH;
+                    }
+                    $siteNameBox = imagettfbbox($brandFontSize, 0, $fontBold, $siteName);
+                    $siteNameW = !empty($siteName) ? abs($siteNameBox[2] - $siteNameBox[0]) : 0;
+                    $gap = !empty($siteName) ? 15 : 0;
+                    $totalBrandW = $logoW + $gap + $siteNameW;
+                    $brandX = (int)(($w - $totalBrandW) / 2);
+
+                    $logoY = $brandY + (int)(($brandFontSize - $logoH) / 2);
+                    imagecopyresampled($img, $logo, $brandX, $logoY, 0, 0, $logoW, $logoH, $logoInfo[0], $logoInfo[1]);
+                    imagedestroy($logo);
+                    $brandX += $logoW + $gap;
+                }
+            }
+        } else {
+            if (!empty($siteName)) {
+                $siteBox = imagettfbbox($brandFontSize, 0, $fontBold, $siteName);
+                $siteNameW = abs($siteBox[2] - $siteBox[0]);
+                $brandX = (int)(($w - $siteNameW) / 2);
+            }
+        }
+
+        if (!empty($siteName)) {
+            imagettftext($img, $brandFontSize, 0, $brandX, $brandY + $brandFontSize, $white, $fontBold, $siteName);
+        }
+    }
+
+    /**
+     * Save an image to the smp-images upload directory and return its public URL.
+     */
+    private function saveImage($img, string $filenameBase): ?string
+    {
         $uploadDir = QA_BASE_DIR . 'qa-uploads/smp-images/';
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
 
-        $filename = 'smp_quote_' . date('Ymd') . '_' . uniqid() . '.png';
+        $filename = $filenameBase . '.png';
         $filepath = $uploadDir . $filename;
 
         imagesavealpha($img, true);
