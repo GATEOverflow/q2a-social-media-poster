@@ -248,7 +248,7 @@ class SmpDailyPoster
         // Build LIKE NOT conditions for tags
         $tagConditions = [];
         foreach ($tagExclusions as $tag) {
-            $escapedTag = qa_db_argument_to_mysql($tag, false);
+            $escapedTag = qa_db_escape_string($tag);
             $tagConditions[] = "p.tags NOT LIKE '%" . $escapedTag . "%'";
         }
         $tagWhere = implode(' AND ', $tagConditions);
