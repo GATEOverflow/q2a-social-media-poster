@@ -1076,13 +1076,15 @@ class SmpAdmin
             $laSource = $la['token_expiry_source'] ?? '';
             $laCreds = $la['credentials'] ?? [];
             $hasRefreshToken = !empty($laCreds['refresh_token']);
+            $hasAccessToken = !empty($laCreds['access_token']);
             $hasClientId = !empty($laCreds['client_id']);
+            $isAuthenticated = $hasRefreshToken || $hasAccessToken;
             $statusHtml = 'LinkedIn: <strong>' . htmlspecialchars($laName, ENT_QUOTES, 'UTF-8') . '</strong>';
 
             if ($laSource === 'invalid') {
                 $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Invalid / Revoked</span>';
                 $needsLinkedInOAuth = true;
-            } elseif ($hasClientId && !$hasRefreshToken) {
+            } elseif ($hasClientId && !$isAuthenticated) {
                 $statusHtml .= ' — <span style="color:#e65100;font-weight:bold;">Not authenticated — click below to connect</span>';
                 $needsLinkedInOAuth = true;
             } elseif (!empty($laExpiry)) {
@@ -1248,7 +1250,7 @@ class SmpAdmin
             if (empty($clientId)) continue;
 
             $laName = $la['name'] ?? ('LinkedIn Account ' . ($li + 1));
-            $hasToken = !empty($laCreds['refresh_token']);
+            $hasToken = !empty($laCreds['refresh_token']) || !empty($laCreds['access_token']);
             $btnLabel = $hasToken ? '🔑 Re-authenticate: ' : '🔑 Authenticate: ';
 
             $authUrl = 'https://www.linkedin.com/oauth/v2/authorization?' . http_build_query([
