@@ -55,15 +55,12 @@ class SmpImageGenerator
             return null;
         }
 
-        // Pre-process: convert MathJax before parsing structure
         $text = $this->convertMathJaxToUnicode($text);
         $title = $this->convertMathJaxToUnicode($title);
 
-        // Parse question body and options separately from HTML
         $questionBody = '';
         $options = [];
         $this->parseQuestionHtml($text, $questionBody, $options);
-
         $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
 
         $w = $this->width;
@@ -75,9 +72,9 @@ class SmpImageGenerator
         }
         imagesavealpha($img, true);
 
-        // --- Professional gradient background (dark navy → deep blue) ---
-        $topR = 15; $topG = 23; $topB = 42;    // #0f172a
-        $botR = 30; $botG = 58; $botB = 95;    // #1e3a5f
+        // --- Material Design: clean dark surface gradient ---
+        $topR = 18; $topG = 18; $topB = 18;    // #121212 (MD dark surface)
+        $botR = 30; $botG = 30; $botB = 42;    // slight blue tint at bottom
         for ($y = 0; $y < $h; $y++) {
             $ratio = $y / max($h - 1, 1);
             $r = (int)($topR + ($botR - $topR) * $ratio);
@@ -87,18 +84,13 @@ class SmpImageGenerator
             imageline($img, 0, $y, $w - 1, $y, $lineCol);
         }
 
-        // Subtle geometric accent — top-right corner circle
-        $circleCol = imagecolorallocatealpha($img, 255, 255, 255, 118);
-        imagefilledellipse($img, (int)($w * 0.90), (int)($h * 0.08), 200, 200, $circleCol);
-        imagefilledellipse($img, (int)($w * 0.08), (int)($h * 0.92), 150, 150, $circleCol);
+        // Accent bar at top (Material primary color)
+        $primaryCol = imagecolorallocate($img, 66, 133, 244); // Google Blue #4285F4
+        imagefilledrectangle($img, 0, 0, $w - 1, 4, $primaryCol);
 
-        // Accent bar at top
-        $accentCol = imagecolorallocate($img, 59, 130, 246); // bright blue #3B82F6
-        imagefilledrectangle($img, 0, 0, $w - 1, 6, $accentCol);
-
-        $padding = 65;
+        $padding = 60;
         $innerW = $w - 2 * $padding;
-        $yOffset = 50;
+        $yOffset = 40;
 
         // --- Fonts ---
         $fontRegular = $this->fontPath;
@@ -106,104 +98,121 @@ class SmpImageGenerator
         if (!file_exists($fontBold)) $fontBold = $fontRegular;
 
         $white = imagecolorallocate($img, 255, 255, 255);
-        $lightText = imagecolorallocate($img, 200, 210, 230);
-        $accent = imagecolorallocate($img, 59, 130, 246);  // #3B82F6
-        $optionBg = imagecolorallocatealpha($img, 255, 255, 255, 105); // subtle white
-        $optionLabelBg = imagecolorallocate($img, 59, 130, 246);
 
-        // --- "QUESTION OF THE DAY" badge ---
-        $badgeText = 'QUESTION OF THE DAY';
-        $badgeSize = 14;
-        $badgeBox = imagettfbbox($badgeSize, 0, $fontBold, $badgeText);
-        $badgeW = abs($badgeBox[2] - $badgeBox[0]);
-        $badgeH = abs($badgeBox[7] - $badgeBox[1]);
-        $badgePadX = 20;
-        $badgePadY = 8;
-        $badgeX = (int)(($w - $badgeW - 2 * $badgePadX) / 2);
-        // Badge pill background
-        $pillBg = imagecolorallocatealpha($img, 59, 130, 246, 60);
-        imagefilledrectangle($img, $badgeX, $yOffset, $badgeX + $badgeW + 2 * $badgePadX, $yOffset + $badgeH + 2 * $badgePadY, $pillBg);
-        imagettftext($img, $badgeSize, 0, $badgeX + $badgePadX, $yOffset + $badgePadY + $badgeSize, $white, $fontBold, $badgeText);
-        $yOffset += $badgeH + 2 * $badgePadY + 25;
+        // --- "QUESTION OF THE DAY" header ---
+        $headerSize = 13;
+        $headerText = 'QUESTION OF THE DAY';
+        $headerBox = imagettfbbox($headerSize, 0, $fontBold, $headerText);
+        $headerW = abs($headerBox[2] - $headerBox[0]);
+        $headerX = (int)(($w - $headerW) / 2);
+        $headerCol = imagecolorallocate($img, 138, 180, 248); // MD Blue 200 #8AB4F8
+        imagettftext($img, $headerSize, 0, $headerX, $yOffset + $headerSize, $headerCol, $fontBold, $headerText);
+        $yOffset += $headerSize + 12;
 
-        // --- Question text (white, clean, wrapped) ---
-        $qFontSize = 24;
+        // Subtle divider line under header
+        $dividerCol = imagecolorallocatealpha($img, 255, 255, 255, 108); // ~15% white
+        imageline($img, $padding + 60, (int)$yOffset, $w - $padding - 60, (int)$yOffset, $dividerCol);
+        $yOffset += 24;
+
+        // --- Question card (elevated surface) ---
+        $cardBg = imagecolorallocate($img, 30, 30, 30); // MD surface #1E1E1E
+        $cardRadius = 16;
+        $cardPadding = 28;
+
+        // Estimate question height to draw card background
+        $qFontSize = 22;
         $qLen = mb_strlen($questionBody);
-        if ($qLen > 300) {
-            $qFontSize = 20;
-        } elseif ($qLen > 150) {
-            $qFontSize = 22;
-        }
+        if ($qLen > 300) $qFontSize = 18;
+        elseif ($qLen > 200) $qFontSize = 20;
 
-        $wrappedQ = $this->wrapText($questionBody, $qFontSize, $innerW);
+        $qInnerW = $innerW - 2 * $cardPadding;
+        $wrappedQ = $this->wrapText($questionBody, $qFontSize, $qInnerW);
         $qLineH = $qFontSize + 10;
 
-        // Limit question to reasonable space
-        $maxQLines = empty($options) ? 20 : (count($options) <= 4 ? 8 : 6);
-        $truncated = false;
+        $maxQLines = empty($options) ? 18 : (count($options) <= 4 ? 7 : 5);
         if (count($wrappedQ) > $maxQLines) {
             $wrappedQ = array_slice($wrappedQ, 0, $maxQLines);
             $wrappedQ[$maxQLines - 1] .= '...';
-            $truncated = true;
         }
 
+        $qCardH = count($wrappedQ) * $qLineH + 2 * $cardPadding;
+        $qCardTop = (int)$yOffset;
+        $qCardBot = (int)($yOffset + $qCardH);
+
+        // Draw question card with rounded corners
+        $this->drawRoundedRect($img, $padding, $qCardTop, $padding + $innerW, $qCardBot, $cardRadius, $cardBg);
+
+        // Left accent bar on question card
+        $accentBar = imagecolorallocate($img, 66, 133, 244);
+        $this->drawRoundedRect($img, $padding, $qCardTop, $padding + 4, $qCardBot, 2, $accentBar);
+
+        // Render question text
+        $qTextCol = imagecolorallocate($img, 232, 234, 237); // MD high-emphasis #E8EAED
+        $qTxtY = $qCardTop + $cardPadding;
         foreach ($wrappedQ as $line) {
-            imagettftext($img, $qFontSize, 0, $padding, $yOffset + $qFontSize, $white, $fontRegular, $line);
-            $yOffset += $qLineH;
+            imagettftext($img, $qFontSize, 0, $padding + $cardPadding + 8, (int)($qTxtY + $qFontSize), $qTextCol, $fontRegular, $line);
+            $qTxtY += $qLineH;
         }
-        $yOffset += 20;
+        $yOffset = $qCardBot + 20;
 
-        // --- Options (styled boxes with letter badges) ---
+        // --- Options (Material card-style rows) ---
         if (!empty($options)) {
-            $optFontSize = 20;
+            $optFontSize = 18;
             $optLineH = $optFontSize + 8;
-            $optPadY = 14;
-            $optPadX = 55; // space for label badge
-            $optGap = 10;
-            $labelSize = 16;
-            $labelBoxW = 36;
-            $labelBoxH = 36;
+            $optPadY = 16;
+            $circleD = 38; // circle diameter for label badge
+            $circleR = $circleD / 2;
+            $optGap = 12;
+            $optTextXOffset = $circleD + 24; // space after circle badge
+            $labelSize = 15;
 
-            // Adjust font if many/long options
+            // Shrink font for long options
             $maxOptLen = 0;
             foreach ($options as $opt) {
                 $maxOptLen = max($maxOptLen, mb_strlen($opt['text']));
             }
             if ($maxOptLen > 80 || count($options) > 4) {
-                $optFontSize = 18;
+                $optFontSize = 16;
                 $optLineH = $optFontSize + 8;
             }
 
-            $optInnerW = $innerW - $optPadX - 15;
+            $optInnerW = $innerW - $optTextXOffset - 24;
+            $optSurfaceBg = imagecolorallocate($img, 40, 40, 43); // MD surface variant
+            $optTextCol = imagecolorallocate($img, 218, 220, 224); // MD medium-emphasis
+            $circleBg = imagecolorallocate($img, 66, 133, 244); // Google Blue
 
             foreach ($options as $opt) {
                 $label = $opt['label'];
                 $optText = $opt['text'];
                 $wrappedOpt = $this->wrapText($optText, $optFontSize, $optInnerW);
-                $boxH = max($labelBoxH + 2, count($wrappedOpt) * $optLineH + 2 * $optPadY);
+                $boxH = max($circleD + 8, count($wrappedOpt) * $optLineH + 2 * $optPadY);
 
-                // Check if we have space
-                if ($yOffset + $boxH + $optGap > $h - 90) {
-                    break; // no room for more options
+                if ($yOffset + $boxH + $optGap > $h - 80) {
+                    break;
                 }
 
-                // Option background (rounded rectangle approximation)
-                imagefilledrectangle($img, $padding, (int)$yOffset, $padding + $innerW, (int)($yOffset + $boxH), $optionBg);
+                $optTop = (int)$yOffset;
+                $optBot = (int)($yOffset + $boxH);
 
-                // Label badge (A, B, C, D)
-                $lblX = $padding + 10;
-                $lblY = (int)($yOffset + ($boxH - $labelBoxH) / 2);
-                imagefilledrectangle($img, $lblX, $lblY, $lblX + $labelBoxW, $lblY + $labelBoxH, $optionLabelBg);
-                // Center label letter
+                // Option card background
+                $this->drawRoundedRect($img, $padding, $optTop, $padding + $innerW, $optBot, 12, $optSurfaceBg);
+
+                // Circle label badge (centered vertically)
+                $circleCX = $padding + 16 + (int)$circleR;
+                $circleCY = (int)($optTop + $boxH / 2);
+                imagefilledellipse($img, $circleCX, $circleCY, $circleD, $circleD, $circleBg);
+
+                // Center label letter in circle
                 $lblBox = imagettfbbox($labelSize, 0, $fontBold, $label);
                 $lblTxtW = abs($lblBox[2] - $lblBox[0]);
-                $lblTxtX = $lblX + (int)(($labelBoxW - $lblTxtW) / 2);
-                imagettftext($img, $labelSize, 0, $lblTxtX, $lblY + $labelSize + (int)(($labelBoxH - $labelSize) / 2), $white, $fontBold, $label);
+                $lblTxtH = abs($lblBox[7] - $lblBox[1]);
+                $lblTxtX = $circleCX - (int)($lblTxtW / 2);
+                $lblTxtY = $circleCY + (int)($lblTxtH / 2);
+                imagettftext($img, $labelSize, 0, $lblTxtX, $lblTxtY, $white, $fontBold, $label);
 
                 // Option text
-                $optTxtX = $padding + $optPadX;
-                $optTxtY = $yOffset + $optPadY;
-                $optTextCol = imagecolorallocate($img, 230, 235, 245);
+                $optTxtX = $padding + $optTextXOffset;
+                $optTxtY = $optTop + $optPadY;
                 foreach ($wrappedOpt as $optLine) {
                     imagettftext($img, $optFontSize, 0, $optTxtX, (int)($optTxtY + $optFontSize), $optTextCol, $fontRegular, $optLine);
                     $optTxtY += $optLineH;
@@ -216,8 +225,27 @@ class SmpImageGenerator
         // --- Bottom branding ---
         $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
 
-        // --- Save ---
         return $this->saveImage($img, 'smp_qotd_' . ($postId ?: uniqid()) . '_' . time());
+    }
+
+    /**
+     * Draw a filled rounded rectangle using GD.
+     */
+    private function drawRoundedRect($img, int $x1, int $y1, int $x2, int $y2, int $radius, $color): void
+    {
+        $radius = min($radius, (int)(($x2 - $x1) / 2), (int)(($y2 - $y1) / 2));
+        if ($radius < 1) {
+            imagefilledrectangle($img, $x1, $y1, $x2, $y2, $color);
+            return;
+        }
+        // Center rectangles
+        imagefilledrectangle($img, $x1 + $radius, $y1, $x2 - $radius, $y2, $color);
+        imagefilledrectangle($img, $x1, $y1 + $radius, $x2, $y2 - $radius, $color);
+        // Four corner circles
+        imagefilledellipse($img, $x1 + $radius, $y1 + $radius, $radius * 2, $radius * 2, $color);
+        imagefilledellipse($img, $x2 - $radius, $y1 + $radius, $radius * 2, $radius * 2, $color);
+        imagefilledellipse($img, $x1 + $radius, $y2 - $radius, $radius * 2, $radius * 2, $color);
+        imagefilledellipse($img, $x2 - $radius, $y2 - $radius, $radius * 2, $radius * 2, $color);
     }
 
     /**

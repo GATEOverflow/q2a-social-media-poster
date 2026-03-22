@@ -62,6 +62,7 @@ class SmpAdmin
 
         $saved = false;
         $message = '';
+        $previewHtml = '';
 
         $saveAll = qa_clicked('smp_save_all');
 
@@ -202,11 +203,11 @@ class SmpAdmin
                         break 2;
                     }
                     if (qa_clicked('smp_preview_quote_' . $platformId . '_' . $idx)) {
-                        $message = $this->previewQuoteImage();
+                        $previewHtml = $this->previewQuoteImage();
                         break 2;
                     }
                     if (qa_clicked('smp_preview_qotd_' . $platformId . '_' . $idx)) {
-                        $message = $this->previewQotdImage();
+                        $previewHtml = $this->previewQotdImage();
                         break 2;
                     }
                 }
@@ -1173,6 +1174,11 @@ class SmpAdmin
             $ok = $message;
         }
 
+        // Inject preview HTML directly into page content (bypasses Q2A's auto-fading ok message)
+        if (!empty($previewHtml)) {
+            $qa_content['custom_preview'] = $previewHtml;
+        }
+
         return [
             'ok' => $ok,
             'fields' => $fields,
@@ -1730,11 +1736,14 @@ class SmpAdmin
             return '❌ Preview failed: Image generation failed.';
         }
 
-        return '👁 Quote preview generated: <div style="margin:10px 0;padding:15px;background:#f5f5f5;border:2px solid #00897b;border-radius:8px;position:relative;display:inline-block;">' 
-            . '<button onclick="this.parentElement.style.display=\'none\'" style="position:absolute;top:5px;right:8px;background:#ea4335;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:24px;text-align:center;">✕</button>'
-            . '<a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">'
-            . '<img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" style="max-width:500px;max-height:500px;border:1px solid #ddd;border-radius:4px;display:block;" /></a></div>';
+        $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
+        return '<div style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
+            . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+            . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📷 Quote Image Preview</span>'
+            . '<button onclick="this.closest(\'div[style]\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
+            . '</div>'
+            . '<a href="' . $safeUrl . '" target="_blank">'
+            . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
     }
 
     /**
@@ -1760,11 +1769,14 @@ class SmpAdmin
             return '❌ Preview failed: Image generation failed.';
         }
 
-        return '👁 QOTD preview (Post #' . $postId . '): <div style="margin:10px 0;padding:15px;background:#f5f5f5;border:2px solid #6a1b9a;border-radius:8px;position:relative;display:inline-block;">'
-            . '<button onclick="this.parentElement.style.display=\'none\'" style="position:absolute;top:5px;right:8px;background:#ea4335;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:24px;text-align:center;">✕</button>'
-            . '<a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">'
-            . '<img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" style="max-width:500px;max-height:500px;border:1px solid #ddd;border-radius:4px;display:block;" /></a></div>';
+        $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
+        return '<div style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
+            . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+            . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📝 QOTD Preview — Post #' . $postId . '</span>'
+            . '<button onclick="this.closest(\'div[style]\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
+            . '</div>'
+            . '<a href="' . $safeUrl . '" target="_blank">'
+            . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
     }
 
     private function saveGeneralSettings(): void
