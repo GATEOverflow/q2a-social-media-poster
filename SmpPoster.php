@@ -298,13 +298,13 @@ class SmpPoster
 
         switch ($platform) {
             case SmpConstants::PLATFORM_TELEGRAM:
-                return $this->postToTelegram($creds, $message);
+                return $this->postToTelegram($creds, $message, $imageUrl);
             case SmpConstants::PLATFORM_FACEBOOK:
-                return $this->postToFacebook($creds, $message);
+                return $this->postToFacebook($creds, $message, $imageUrl);
             case SmpConstants::PLATFORM_X:
-                return $this->postToX($creds, $message);
+                return $this->postToX($creds, $message, $imageUrl);
             case SmpConstants::PLATFORM_LINKEDIN:
-                return $this->postToLinkedin($creds, $message);
+                return $this->postToLinkedin($creds, $message, $imageUrl);
             case SmpConstants::PLATFORM_WHATSAPP:
                 if (!empty($extra['whatsapp_template'])) {
                     return $this->postToWhatsappTemplate($creds, $message, $extra);
@@ -322,7 +322,7 @@ class SmpPoster
     /**
      * Post to Telegram.
      */
-    private function postToTelegram(array $creds, string $message): array
+    private function postToTelegram(array $creds, string $message, ?string $imageUrl = null): array
     {
         $botToken = $creds['bot_token'] ?? '';
         $chatId = $creds['chat_id'] ?? '';
@@ -331,13 +331,23 @@ class SmpPoster
             return ['success' => false, 'error' => 'Missing Telegram credentials'];
         }
 
-        $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendMessage";
-
-        $postData = [
-            'chat_id' => $chatId,
-            'text' => $message,
-            'parse_mode' => 'HTML',
-        ];
+        if (!empty($imageUrl)) {
+            // Send photo with caption
+            $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendPhoto";
+            $postData = [
+                'chat_id' => $chatId,
+                'photo' => $imageUrl,
+                'caption' => $message,
+                'parse_mode' => 'HTML',
+            ];
+        } else {
+            $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendMessage";
+            $postData = [
+                'chat_id' => $chatId,
+                'text' => $message,
+                'parse_mode' => 'HTML',
+            ];
+        }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -364,7 +374,7 @@ class SmpPoster
     /**
      * Post to Facebook Page.
      */
-    private function postToFacebook(array $creds, string $message): array
+    private function postToFacebook(array $creds, string $message, ?string $imageUrl = null): array
     {
         $pageAccessToken = $creds['page_access_token'] ?? '';
         $pageId = $creds['page_id'] ?? '';
@@ -373,12 +383,20 @@ class SmpPoster
             return ['success' => false, 'error' => 'Missing Facebook credentials'];
         }
 
-        $url = "https://graph.facebook.com/v21.0/" . urlencode($pageId) . "/feed";
-
-        $postData = [
-            'message' => $message,
-            'access_token' => $pageAccessToken,
-        ];
+        if (!empty($imageUrl)) {
+            $url = "https://graph.facebook.com/v21.0/" . urlencode($pageId) . "/photos";
+            $postData = [
+                'url' => $imageUrl,
+                'message' => $message,
+                'access_token' => $pageAccessToken,
+            ];
+        } else {
+            $url = "https://graph.facebook.com/v21.0/" . urlencode($pageId) . "/feed";
+            $postData = [
+                'message' => $message,
+                'access_token' => $pageAccessToken,
+            ];
+        }
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -405,7 +423,7 @@ class SmpPoster
     /**
      * Post to X (Twitter).
      */
-    private function postToX(array $creds, string $message): array
+    private function postToX(array $creds, string $message, ?string $imageUrl = null): array
     {
         $apiKey = $creds['api_key'] ?? '';
         $apiSecret = $creds['api_secret'] ?? '';
@@ -447,7 +465,7 @@ class SmpPoster
     /**
      * Post to LinkedIn.
      */
-    private function postToLinkedin(array $creds, string $message): array
+    private function postToLinkedin(array $creds, string $message, ?string $imageUrl = null): array
     {
         $accessToken = $creds['access_token'] ?? '';
         $author = $creds['author_urn'] ?? '';
@@ -466,6 +484,11 @@ class SmpPoster
 
         if (empty($accessToken) || empty($author)) {
             return ['success' => false, 'error' => 'Missing LinkedIn credentials (access_token or author_urn)'];
+        }
+
+        // If image is available, upload it and post as IMAGE share
+        if (!empty($imageUrl)) {
+            return $this->postToLinkedinWithImage($accessToken, $author, $message, $imageUrl);
         }
 
         $url = 'https://api.linkedin.com/v2/ugcPosts';
@@ -488,6 +511,116 @@ class SmpPoster
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json',
+            'x-li-format: json',
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return ['success' => false, 'error' => 'cURL error: ' . $error];
+        }
+
+        $data = json_decode($response, true);
+        if (isset($data['id'])) {
+            return ['success' => true, 'response' => $data];
+        }
+
+        return ['success' => false, 'error' => $response];
+    }
+
+    /**
+     * Post to LinkedIn with an image.
+     * Uses the 3-step process: register upload, upload binary, create post.
+     */
+    private function postToLinkedinWithImage(string $accessToken, string $author, string $message, string $imageUrl): array
+    {
+        // Step 1: Register upload
+        $registerData = [
+            'registerUploadRequest' => [
+                'recipes' => ['urn:li:digitalmediaRecipe:feedshare-image'],
+                'owner' => $author,
+                'serviceRelationships' => [
+                    ['relationshipType' => 'OWNER', 'identifier' => 'urn:li:userGeneratedContent'],
+                ],
+            ],
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://api.linkedin.com/v2/assets?action=registerUpload');
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($registerData));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: application/json',
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        $regResponse = json_decode(curl_exec($ch), true);
+        curl_close($ch);
+
+        $uploadUrl = $regResponse['value']['uploadMechanism']['com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest']['uploadUrl'] ?? '';
+        $asset = $regResponse['value']['asset'] ?? '';
+
+        if (empty($uploadUrl) || empty($asset)) {
+            // Fallback to text-only post
+            return ['success' => false, 'error' => 'LinkedIn image register failed: ' . json_encode($regResponse)];
+        }
+
+        // Step 2: Download image and upload binary to LinkedIn
+        $imageData = @file_get_contents($imageUrl);
+        if (empty($imageData)) {
+            return ['success' => false, 'error' => 'Could not download image from ' . $imageUrl];
+        }
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $uploadUrl);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $imageData);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Authorization: Bearer ' . $accessToken,
+            'Content-Type: image/png',
+        ]);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode < 200 || $httpCode >= 300) {
+            return ['success' => false, 'error' => 'LinkedIn image upload failed with HTTP ' . $httpCode];
+        }
+
+        // Step 3: Create UGC post with image
+        $postData = [
+            'author' => $author,
+            'lifecycleState' => 'PUBLISHED',
+            'specificContent' => [
+                'com.linkedin.ugc.ShareContent' => [
+                    'shareCommentary' => ['text' => $message],
+                    'shareMediaCategory' => 'IMAGE',
+                    'media' => [
+                        [
+                            'status' => 'READY',
+                            'media' => $asset,
+                        ],
+                    ],
+                ],
+            ],
+            'visibility' => [
+                'com.linkedin.ugc.MemberNetworkVisibility' => 'PUBLIC',
+            ],
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, 'https://api.linkedin.com/v2/ugcPosts');
         curl_setopt($ch, CURLOPT_POST, 1);
         curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
         curl_setopt($ch, CURLOPT_HTTPHEADER, [

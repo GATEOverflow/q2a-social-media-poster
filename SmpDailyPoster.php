@@ -103,28 +103,10 @@ class SmpDailyPoster
         // Strip HTML for text content
         $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
 
-        // Build the QOTD message
+        // Build the QOTD message (image has the full question, caption just has link)
         $messagePrefix = "📝 Question of the Day\n\n";
-        $messagePrefix .= "Q: " . $title . "\n\n";
-
-        // Truncate body for social media
-        $bodySnippet = mb_substr($rawContent, 0, 400);
-        if (mb_strlen($rawContent) > 400) {
-            $bodySnippet .= '...';
-        }
-
-        // Add answer options hint
-        $optionLabels = $this->extractOptions($content);
-        if (!empty($optionLabels)) {
-            $messagePrefix .= $bodySnippet . "\n\n";
-            foreach ($optionLabels as $label) {
-                $messagePrefix .= $label . "\n";
-            }
-        } else {
-            $messagePrefix .= $bodySnippet . "\n";
-        }
-
-        $messagePrefix .= "\n🔗 Answer & Discussion: " . $url;
+        $messagePrefix .= $title . "\n\n";
+        $messagePrefix .= "🔗 Answer & Discussion: " . $url;
         $messagePrefix .= "\n\n#QuestionOfTheDay #QOTD";
 
         // Optionally enhance with OpenAI
@@ -133,17 +115,11 @@ class SmpDailyPoster
             'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
         );
 
-        // Generate image for Instagram/YouTube if needed
+        // Generate QOTD image (used across all platforms)
         $imageUrl = null;
-        $accountPlatforms = array_column($accounts, '_platform');
-        $needsImage = in_array(SmpConstants::PLATFORM_INSTAGRAM, $accountPlatforms)
-            || (in_array(SmpConstants::PLATFORM_YOUTUBE, $accountPlatforms)
-                && qa_opt(SmpConstants::OPT_YOUTUBE_AUTO_VIDEO));
-        if ($needsImage) {
-            require_once $this->directory . 'SmpImageGenerator.php';
-            $imageGen = new SmpImageGenerator();
-            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
-        }
+        require_once $this->directory . 'SmpImageGenerator.php';
+        $imageGen = new SmpImageGenerator();
+        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
 
         $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, ['title' => $title]);
 
