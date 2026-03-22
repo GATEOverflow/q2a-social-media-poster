@@ -55,111 +55,204 @@ class SmpImageGenerator
             return null;
         }
 
-        // Pre-process: convert MathJax and extract options before stripping HTML
+        // Pre-process: convert MathJax before parsing structure
         $text = $this->convertMathJaxToUnicode($text);
         $title = $this->convertMathJaxToUnicode($title);
-        $text = $this->convertHtmlOptionsToText($text);
 
-        // Strip remaining HTML tags and decode entities
-        $text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
+        // Parse question body and options separately from HTML
+        $questionBody = '';
+        $options = [];
+        $this->parseQuestionHtml($text, $questionBody, $options);
+
         $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
 
-        // Clean up excessive whitespace
-        $text = preg_replace('/\n{3,}/', "\n\n", trim($text));
+        $w = $this->width;
+        $h = $this->height;
 
-        $img = imagecreatetruecolor($this->width, $this->height);
+        $img = imagecreatetruecolor($w, $h);
         if (!$img) {
             return null;
         }
+        imagesavealpha($img, true);
 
-        // Background
-        $bg = imagecolorallocate($img, $this->bgColor[0], $this->bgColor[1], $this->bgColor[2]);
-        imagefilledrectangle($img, 0, 0, $this->width - 1, $this->height - 1, $bg);
-
-        $textCol = imagecolorallocate($img, $this->textColor[0], $this->textColor[1], $this->textColor[2]);
-
-        $padding = 60;
-        $yOffset = $padding;
-
-        // Draw logo if configured
-        if ($this->logoUrl && file_exists($this->logoUrl)) {
-            $logoInfo = getimagesize($this->logoUrl);
-            if ($logoInfo) {
-                $logo = $this->loadImage($this->logoUrl, $logoInfo[2]);
-                if ($logo) {
-                    $logoW = $logoInfo[0];
-                    $logoH = $logoInfo[1];
-                    $maxLogoH = 80;
-                    if ($logoH > $maxLogoH) {
-                        $ratio = $maxLogoH / $logoH;
-                        $logoW = (int)($logoW * $ratio);
-                        $logoH = $maxLogoH;
-                    }
-                    $logoX = ($this->width - $logoW) / 2;
-                    imagecopyresampled($img, $logo, (int)$logoX, $yOffset, 0, 0, $logoW, $logoH, $logoInfo[0], $logoInfo[1]);
-                    imagedestroy($logo);
-                    $yOffset += $logoH + 30;
-                }
-            }
+        // --- Professional gradient background (dark navy → deep blue) ---
+        $topR = 15; $topG = 23; $topB = 42;    // #0f172a
+        $botR = 30; $botG = 58; $botB = 95;    // #1e3a5f
+        for ($y = 0; $y < $h; $y++) {
+            $ratio = $y / max($h - 1, 1);
+            $r = (int)($topR + ($botR - $topR) * $ratio);
+            $g = (int)($topG + ($botG - $topG) * $ratio);
+            $b = (int)($topB + ($botB - $topB) * $ratio);
+            $lineCol = imagecolorallocate($img, $r, $g, $b);
+            imageline($img, 0, $y, $w - 1, $y, $lineCol);
         }
 
-        // Draw title
-        if (!empty($title)) {
-            $titleSize = $this->fontSize + 6;
-            $wrappedTitle = $this->wrapText($title, $titleSize, $this->width - 2 * $padding);
-            foreach ($wrappedTitle as $line) {
-                if ($yOffset > $this->height - $padding) break;
-                imagettftext($img, $titleSize, 0, $padding, $yOffset + $titleSize, $textCol, $this->fontPath, $line);
-                $yOffset += $titleSize + 10;
-            }
-            $yOffset += 20;
+        // Subtle geometric accent — top-right corner circle
+        $circleCol = imagecolorallocatealpha($img, 255, 255, 255, 118);
+        imagefilledellipse($img, (int)($w * 0.90), (int)($h * 0.08), 200, 200, $circleCol);
+        imagefilledellipse($img, (int)($w * 0.08), (int)($h * 0.92), 150, 150, $circleCol);
+
+        // Accent bar at top
+        $accentCol = imagecolorallocate($img, 59, 130, 246); // bright blue #3B82F6
+        imagefilledrectangle($img, 0, 0, $w - 1, 6, $accentCol);
+
+        $padding = 65;
+        $innerW = $w - 2 * $padding;
+        $yOffset = 50;
+
+        // --- Fonts ---
+        $fontRegular = $this->fontPath;
+        $fontBold = str_replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf', $this->fontPath);
+        if (!file_exists($fontBold)) $fontBold = $fontRegular;
+
+        $white = imagecolorallocate($img, 255, 255, 255);
+        $lightText = imagecolorallocate($img, 200, 210, 230);
+        $accent = imagecolorallocate($img, 59, 130, 246);  // #3B82F6
+        $optionBg = imagecolorallocatealpha($img, 255, 255, 255, 105); // subtle white
+        $optionLabelBg = imagecolorallocate($img, 59, 130, 246);
+
+        // --- "QUESTION OF THE DAY" badge ---
+        $badgeText = 'QUESTION OF THE DAY';
+        $badgeSize = 14;
+        $badgeBox = imagettfbbox($badgeSize, 0, $fontBold, $badgeText);
+        $badgeW = abs($badgeBox[2] - $badgeBox[0]);
+        $badgeH = abs($badgeBox[7] - $badgeBox[1]);
+        $badgePadX = 20;
+        $badgePadY = 8;
+        $badgeX = (int)(($w - $badgeW - 2 * $badgePadX) / 2);
+        // Badge pill background
+        $pillBg = imagecolorallocatealpha($img, 59, 130, 246, 60);
+        imagefilledrectangle($img, $badgeX, $yOffset, $badgeX + $badgeW + 2 * $badgePadX, $yOffset + $badgeH + 2 * $badgePadY, $pillBg);
+        imagettftext($img, $badgeSize, 0, $badgeX + $badgePadX, $yOffset + $badgePadY + $badgeSize, $white, $fontBold, $badgeText);
+        $yOffset += $badgeH + 2 * $badgePadY + 25;
+
+        // --- Question text (white, clean, wrapped) ---
+        $qFontSize = 24;
+        $qLen = mb_strlen($questionBody);
+        if ($qLen > 300) {
+            $qFontSize = 20;
+        } elseif ($qLen > 150) {
+            $qFontSize = 22;
         }
 
-        // Draw separator line
-        $sepColor = imagecolorallocate($img, 200, 200, 200);
-        imageline($img, $padding, $yOffset, $this->width - $padding, $yOffset, $sepColor);
+        $wrappedQ = $this->wrapText($questionBody, $qFontSize, $innerW);
+        $qLineH = $qFontSize + 10;
+
+        // Limit question to reasonable space
+        $maxQLines = empty($options) ? 20 : (count($options) <= 4 ? 8 : 6);
+        $truncated = false;
+        if (count($wrappedQ) > $maxQLines) {
+            $wrappedQ = array_slice($wrappedQ, 0, $maxQLines);
+            $wrappedQ[$maxQLines - 1] .= '...';
+            $truncated = true;
+        }
+
+        foreach ($wrappedQ as $line) {
+            imagettftext($img, $qFontSize, 0, $padding, $yOffset + $qFontSize, $white, $fontRegular, $line);
+            $yOffset += $qLineH;
+        }
         $yOffset += 20;
 
-        // Draw body text
-        $wrappedText = $this->wrapText($text, $this->fontSize, $this->width - 2 * $padding);
-        foreach ($wrappedText as $line) {
-            if ($yOffset > $this->height - $padding - 40) {
-                // Add ellipsis if text is truncated
-                imagettftext($img, $this->fontSize, 0, $padding, $yOffset + $this->fontSize, $textCol, $this->fontPath, '...');
-                break;
+        // --- Options (styled boxes with letter badges) ---
+        if (!empty($options)) {
+            $optFontSize = 20;
+            $optLineH = $optFontSize + 8;
+            $optPadY = 14;
+            $optPadX = 55; // space for label badge
+            $optGap = 10;
+            $labelSize = 16;
+            $labelBoxW = 36;
+            $labelBoxH = 36;
+
+            // Adjust font if many/long options
+            $maxOptLen = 0;
+            foreach ($options as $opt) {
+                $maxOptLen = max($maxOptLen, mb_strlen($opt['text']));
             }
-            imagettftext($img, $this->fontSize, 0, $padding, $yOffset + $this->fontSize, $textCol, $this->fontPath, $line);
-            $yOffset += $this->fontSize + 8;
+            if ($maxOptLen > 80 || count($options) > 4) {
+                $optFontSize = 18;
+                $optLineH = $optFontSize + 8;
+            }
+
+            $optInnerW = $innerW - $optPadX - 15;
+
+            foreach ($options as $opt) {
+                $label = $opt['label'];
+                $optText = $opt['text'];
+                $wrappedOpt = $this->wrapText($optText, $optFontSize, $optInnerW);
+                $boxH = max($labelBoxH + 2, count($wrappedOpt) * $optLineH + 2 * $optPadY);
+
+                // Check if we have space
+                if ($yOffset + $boxH + $optGap > $h - 90) {
+                    break; // no room for more options
+                }
+
+                // Option background (rounded rectangle approximation)
+                imagefilledrectangle($img, $padding, (int)$yOffset, $padding + $innerW, (int)($yOffset + $boxH), $optionBg);
+
+                // Label badge (A, B, C, D)
+                $lblX = $padding + 10;
+                $lblY = (int)($yOffset + ($boxH - $labelBoxH) / 2);
+                imagefilledrectangle($img, $lblX, $lblY, $lblX + $labelBoxW, $lblY + $labelBoxH, $optionLabelBg);
+                // Center label letter
+                $lblBox = imagettfbbox($labelSize, 0, $fontBold, $label);
+                $lblTxtW = abs($lblBox[2] - $lblBox[0]);
+                $lblTxtX = $lblX + (int)(($labelBoxW - $lblTxtW) / 2);
+                imagettftext($img, $labelSize, 0, $lblTxtX, $lblY + $labelSize + (int)(($labelBoxH - $labelSize) / 2), $white, $fontBold, $label);
+
+                // Option text
+                $optTxtX = $padding + $optPadX;
+                $optTxtY = $yOffset + $optPadY;
+                $optTextCol = imagecolorallocate($img, 230, 235, 245);
+                foreach ($wrappedOpt as $optLine) {
+                    imagettftext($img, $optFontSize, 0, $optTxtX, (int)($optTxtY + $optFontSize), $optTextCol, $fontRegular, $optLine);
+                    $optTxtY += $optLineH;
+                }
+
+                $yOffset += $boxH + $optGap;
+            }
         }
 
-        // Draw site name at bottom
-        $siteName = qa_opt('site_title') ?: qa_opt('site_name') ?: '';
-        if (!empty($siteName)) {
-            $footerColor = imagecolorallocate($img, 150, 150, 150);
-            $footerSize = $this->fontSize - 6;
-            imageline($img, $padding, $this->height - $padding - 30, $this->width - $padding, $this->height - $padding - 30, $sepColor);
-            imagettftext($img, $footerSize, 0, $padding, $this->height - $padding, $footerColor, $this->fontPath, $siteName);
-        }
+        // --- Bottom branding ---
+        $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
 
-        // Save image
-        $uploadDir = QA_BASE_DIR . 'qa-uploads/smp-images/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
+        // --- Save ---
+        return $this->saveImage($img, 'smp_qotd_' . ($postId ?: uniqid()) . '_' . time());
+    }
 
-        $filename = 'smp_' . ($postId ?: uniqid()) . '_' . time() . '.png';
-        $filepath = $uploadDir . $filename;
+    /**
+     * Parse question HTML into question body text and structured options.
+     */
+    private function parseQuestionHtml(string $html, string &$questionBody, array &$options): void
+    {
+        $options = [];
 
-        imagepng($img, $filepath, 8);
-        imagedestroy($img);
+        // Extract options from <ol><li> before stripping
+        $htmlWithoutOl = preg_replace_callback('/<ol\b[^>]*>(.*?)<\/ol>/is', function ($olMatch) use (&$options) {
+            $olTag = $olMatch[0];
+            $style = 'upper-alpha';
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+                $style = strtolower(trim($sm[1], "; \t"));
+            }
 
-        if (!file_exists($filepath)) {
-            return null;
-        }
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olMatch[1], $liMatches);
+            if (!empty($liMatches[1])) {
+                foreach ($liMatches[1] as $i => $liContent) {
+                    $label = $this->getOptionLabel($style, $i);
+                    // Convert MathJax inside option, then strip tags
+                    $optText = $this->convertMathJaxToUnicode($liContent);
+                    $optText = trim(html_entity_decode(strip_tags($optText), ENT_QUOTES, 'UTF-8'));
+                    $options[] = ['label' => $label, 'text' => $optText];
+                }
+            }
+            return ''; // remove <ol> from body
+        }, $html);
 
-        // Return public URL
-        $siteUrl = rtrim(qa_opt('site_url'), '/');
-        return $siteUrl . '/qa-uploads/smp-images/' . $filename;
+        // Question body = everything except the options
+        $questionBody = html_entity_decode(strip_tags($htmlWithoutOl), ENT_QUOTES, 'UTF-8');
+        $questionBody = preg_replace('/\n{2,}/', "\n", trim($questionBody));
+        // Remove any trailing whitespace/newlines
+        $questionBody = trim($questionBody);
     }
 
     /**
@@ -628,7 +721,7 @@ class SmpImageGenerator
             $ratio = $y / max($h - 1, 1);
             $r = (int)($topR + ($botR - $topR) * $ratio);
             $g = (int)($topG + ($botG - $topG) * $ratio);
-            $b = (int)($topB + ($botB - $botB) * $ratio);
+            $b = (int)($topB + ($botB - $topB) * $ratio);
             $lineCol = imagecolorallocate($img, $r, $g, $b);
             imageline($img, 0, $y, $w - 1, $y, $lineCol);
         }

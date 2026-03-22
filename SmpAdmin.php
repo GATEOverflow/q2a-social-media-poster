@@ -1730,9 +1730,11 @@ class SmpAdmin
             return '❌ Preview failed: Image generation failed.';
         }
 
-        return '👁 Quote preview generated: <a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" target="_blank"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" style="max-width:400px;max-height:400px;vertical-align:middle;border:1px solid #ccc;border-radius:4px;margin:8px 0;" /></a>';
+        return '👁 Quote preview generated: <div style="margin:10px 0;padding:15px;background:#f5f5f5;border:2px solid #00897b;border-radius:8px;position:relative;display:inline-block;">' 
+            . '<button onclick="this.parentElement.style.display=\'none\'" style="position:absolute;top:5px;right:8px;background:#ea4335;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:24px;text-align:center;">✕</button>'
+            . '<a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">'
+            . '<img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" style="max-width:500px;max-height:500px;border:1px solid #ddd;border-radius:4px;display:block;" /></a></div>';
     }
 
     /**
@@ -1758,9 +1760,11 @@ class SmpAdmin
             return '❌ Preview failed: Image generation failed.';
         }
 
-        return '👁 QOTD preview (Post #' . $postId . '): <a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" target="_blank"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
-            . '" style="max-width:400px;max-height:400px;vertical-align:middle;border:1px solid #ccc;border-radius:4px;margin:8px 0;" /></a>';
+        return '👁 QOTD preview (Post #' . $postId . '): <div style="margin:10px 0;padding:15px;background:#f5f5f5;border:2px solid #6a1b9a;border-radius:8px;position:relative;display:inline-block;">'
+            . '<button onclick="this.parentElement.style.display=\'none\'" style="position:absolute;top:5px;right:8px;background:#ea4335;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:24px;text-align:center;">✕</button>'
+            . '<a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank">'
+            . '<img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" style="max-width:500px;max-height:500px;border:1px solid #ddd;border-radius:4px;display:block;" /></a></div>';
     }
 
     private function saveGeneralSettings(): void
