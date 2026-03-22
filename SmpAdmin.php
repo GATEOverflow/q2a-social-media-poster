@@ -1609,24 +1609,9 @@ class SmpAdmin
         $content = $question['content'];
         $url = qa_q_path($postId, $title, true);
 
-        $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
-        $bodySnippet = mb_substr($rawContent, 0, 400);
-        if (mb_strlen($rawContent) > 400) {
-            $bodySnippet .= '...';
-        }
-
-        $messageText = "📝 Question of the Day\n\nQ: " . $title . "\n\n" . $bodySnippet;
-
-        // Extract options from HTML <ol><li> structure
-        $optionLabels = $this->extractOptionsFromHtml($content);
-        if (!empty($optionLabels)) {
-            $messageText .= "\n\n";
-            foreach ($optionLabels as $label) {
-                $messageText .= $label . "\n";
-            }
-        }
-
-        $messageText .= "\n🔗 Answer & Discussion: " . $url;
+        // Caption: just title + link (image has the full question content)
+        $messageText = "📝 Question of the Day\n\n" . $title . "\n\n";
+        $messageText .= "🔗 Answer & Discussion: " . $url;
         $messageText .= "\n\n#QuestionOfTheDay #QOTD";
 
         // Optionally enhance with OpenAI
@@ -1635,12 +1620,9 @@ class SmpAdmin
             'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
         );
 
-        // Generate image for platforms that need it
-        $imageUrl = null;
-        if (in_array($platformId, [SmpConstants::PLATFORM_INSTAGRAM, SmpConstants::PLATFORM_YOUTUBE])) {
-            $imageGen = new SmpImageGenerator();
-            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
-        }
+        // Generate image for all platforms
+        $imageGen = new SmpImageGenerator();
+        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
 
         $account['_platform'] = $platformId;
         $platforms = SmpConstants::getPlatforms();
