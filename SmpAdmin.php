@@ -190,6 +190,18 @@ class SmpAdmin
                         break 2;
                     }
                 }
+
+                // Check for test post buttons
+                foreach ($accounts as $idx => $account) {
+                    if (qa_clicked('smp_test_quote_' . $platformId . '_' . $idx)) {
+                        $message = $this->testQuotePost($platformId, $idx, $account);
+                        break 2;
+                    }
+                    if (qa_clicked('smp_test_qotd_' . $platformId . '_' . $idx)) {
+                        $message = $this->testQotdPost($platformId, $idx, $account);
+                        break 2;
+                    }
+                }
             }
         }
 
@@ -886,7 +898,13 @@ class SmpAdmin
                         'label' => '<button type="submit" name="smp_delete_account_' . $platformId . '_' . $idx
                             . '" onclick="return confirm(\'Are you sure you want to delete this account?\')"'
                             . ' style="background:#ea4335;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:12px;">Delete '
-                            . $acctLabel . '</button>',
+                            . $acctLabel . '</button>'
+                            . ' <button type="submit" name="smp_test_quote_' . $platformId . '_' . $idx
+                            . '" onclick="return confirm(\'Send a test Quote of the Day post to this account?\')"'
+                            . ' style="background:#ff9800;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">📤 Test Quote</button>'
+                            . ' <button type="submit" name="smp_test_qotd_' . $platformId . '_' . $idx
+                            . '" onclick="return confirm(\'Send a test Question of the Day post to this account?\')"'
+                            . ' style="background:#6a1b9a;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">📝 Test QOTD</button>',
                     ];
                 }
             }
@@ -1503,6 +1521,141 @@ class SmpAdmin
         $this->saveAccounts($platformId, $accounts);
 
         return htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ' account deleted.';
+    }
+
+    /**
+     * Send a test Quote of the Day post to a specific account.
+     */
+    private function testQuotePost(string $platformId, int $index, array $account): string
+    {
+        require_once $this->directory . 'SmpPoster.php';
+        require_once $this->directory . 'SmpImageGenerator.php';
+
+        $poster = new SmpPoster($this->directory);
+        $accountName = $account['name'] ?? ('Account ' . ($index + 1));
+
+        // Get a quote: try today's bank quote, then generate one
+        $quote = $poster->getTodayQuote();
+        if (empty($quote)) {
+            $quote = $poster->openaiGenerateMessage(
+                'Generate a motivational Quote of the Day for ' . date('l, F j, Y'),
+                qa_opt(SmpConstants::OPT_QUOTE_PROMPT) ?: 'Generate a unique, inspiring motivational quote suitable for students preparing for competitive exams. Include the quote and attribute it to a famous person or mark it as anonymous. Format it nicely for social media with emojis. Add #QuoteOfTheDay #Motivation hashtags.'
+            );
+        }
+        if (empty($quote)) {
+            return 'Test failed: Could not get a quote (bank empty and OpenAI unavailable).';
+        }
+
+        // Generate image for platforms that need it
+        $imageUrl = null;
+        if (in_array($platformId, [SmpConstants::PLATFORM_INSTAGRAM, SmpConstants::PLATFORM_YOUTUBE])) {
+            $imageGen = new SmpImageGenerator();
+            $imageUrl = $imageGen->generateQuoteImage($quote);
+        }
+
+        // Add platform info to account for postToPlatform
+        $account['_platform'] = $platformId;
+        $platforms = SmpConstants::getPlatforms();
+        $account['_platform_name'] = $platforms[$platformId]['name'] ?? $platformId;
+
+        $result = $poster->postToPlatform($platformId, $account, $quote, $imageUrl, ['title' => 'Quote of the Day']);
+
+        if (!empty($result['success'])) {
+            return '✅ Test quote posted to ' . htmlspecialchars($accountName, ENT_QUOTES, 'UTF-8') . ' (' . htmlspecialchars($account['_platform_name'], ENT_QUOTES, 'UTF-8') . ') successfully.'
+                . (!empty($imageUrl) ? ' Image: ' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8') : '');
+        }
+
+        return '❌ Test quote failed for ' . htmlspecialchars($accountName, ENT_QUOTES, 'UTF-8') . ': ' . htmlspecialchars($result['error'] ?? 'Unknown error', ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Send a test Question of the Day post to a specific account.
+     */
+    private function testQotdPost(string $platformId, int $index, array $account): string
+    {
+        require_once $this->directory . 'SmpPoster.php';
+        require_once $this->directory . 'SmpImageGenerator.php';
+        require_once QA_INCLUDE_DIR . 'app/format.php';
+
+        $poster = new SmpPoster($this->directory);
+        $accountName = $account['name'] ?? ('Account ' . ($index + 1));
+
+        // Fetch a random MCQ question (same logic as SmpDailyPoster)
+        $question = $this->fetchRandomMcqForTest();
+        if (!$question) {
+            return '❌ Test QOTD failed: No eligible MCQ question found in the database.';
+        }
+
+        $postId = (int)$question['postid'];
+        $title = $question['title'];
+        $content = $question['content'];
+        $url = qa_q_path($postId, $title, true);
+
+        $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
+        $bodySnippet = mb_substr($rawContent, 0, 400);
+        if (mb_strlen($rawContent) > 400) {
+            $bodySnippet .= '...';
+        }
+
+        $messageText = "📝 Question of the Day\n\nQ: " . $title . "\n\n" . $bodySnippet;
+
+        // Extract options
+        $text = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
+        if (preg_match_all('/(?:^|\n)\s*(?:\(?([A-Da-d])\)\.?|([A-Da-d])[\)\.]\s*)(.+)/m', $text, $matches, PREG_SET_ORDER)) {
+            $messageText .= "\n\n";
+            foreach ($matches as $match) {
+                $letter = strtoupper($match[1] ?: $match[2]);
+                $optionText = trim($match[3]);
+                $messageText .= $letter . ') ' . mb_substr($optionText, 0, 100) . "\n";
+            }
+        }
+
+        $messageText .= "\n🔗 Answer & Discussion: " . $url;
+        $messageText .= "\n\n#QuestionOfTheDay #QOTD";
+
+        // Optionally enhance with OpenAI
+        $message = $poster->openaiGenerateMessage(
+            $messageText,
+            'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
+        );
+
+        // Generate image for platforms that need it
+        $imageUrl = null;
+        if (in_array($platformId, [SmpConstants::PLATFORM_INSTAGRAM, SmpConstants::PLATFORM_YOUTUBE])) {
+            $imageGen = new SmpImageGenerator();
+            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
+        }
+
+        $account['_platform'] = $platformId;
+        $platforms = SmpConstants::getPlatforms();
+        $account['_platform_name'] = $platforms[$platformId]['name'] ?? $platformId;
+
+        $result = $poster->postToPlatform($platformId, $account, $message, $imageUrl, ['title' => $title]);
+
+        if (!empty($result['success'])) {
+            return '✅ Test QOTD posted to ' . htmlspecialchars($accountName, ENT_QUOTES, 'UTF-8') . ' (' . htmlspecialchars($account['_platform_name'], ENT_QUOTES, 'UTF-8') . '): ' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+        }
+
+        return '❌ Test QOTD failed for ' . htmlspecialchars($accountName, ENT_QUOTES, 'UTF-8') . ': ' . htmlspecialchars($result['error'] ?? 'Unknown error', ENT_QUOTES, 'UTF-8');
+    }
+
+    /**
+     * Fetch a random MCQ question for test posting.
+     */
+    private function fetchRandomMcqForTest(): ?array
+    {
+        $result = qa_db_query_sub(
+            "SELECT p.postid, p.title, p.content, p.tags "
+            . "FROM ^posts p "
+            . "JOIN ^ec_answers a ON p.postid = a.postid "
+            . "WHERE p.type = 'Q' "
+            . "AND a.answer_str != '' "
+            . "AND p.tags NOT LIKE '%numerical-answers%' "
+            . "AND p.tags NOT LIKE '%multiple-selects%' "
+            . "ORDER BY RAND() LIMIT 1"
+        );
+        $row = qa_db_read_one_assoc($result, true);
+        return $row ?: null;
     }
 
     private function saveGeneralSettings(): void

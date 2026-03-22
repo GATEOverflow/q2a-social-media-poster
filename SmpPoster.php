@@ -455,14 +455,13 @@ class SmpPoster
         $clientSecret = $creds['client_secret'] ?? '';
         $refreshToken = $creds['refresh_token'] ?? '';
 
-        // If we have OAuth credentials, get a fresh access token
+        // If we have full OAuth credentials with refresh_token, get a fresh access token
         if (!empty($clientId) && !empty($clientSecret) && !empty($refreshToken)) {
             $refreshResult = $this->refreshLinkedInAccessToken($clientId, $clientSecret, $refreshToken);
             if ($refreshResult['success']) {
                 $accessToken = $refreshResult['access_token'];
-            } else {
-                return ['success' => false, 'error' => 'Failed to refresh LinkedIn token: ' . ($refreshResult['error'] ?? 'Unknown error')];
             }
+            // If refresh fails, fall through to use existing access_token
         }
 
         if (empty($accessToken) || empty($author)) {
@@ -2004,14 +2003,51 @@ class SmpPoster
             $clientId = $creds['client_id'] ?? '';
             $clientSecret = $creds['client_secret'] ?? '';
             $refreshToken = $creds['refresh_token'] ?? '';
+            $accessToken = $creds['access_token'] ?? '';
             $accountName = $liAccount['name'] ?? ('LinkedIn Account ' . ($idx + 1));
 
-            if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+            // No refresh_token: validate the access_token by probing
+            if (empty($refreshToken)) {
+                if (empty($accessToken)) {
+                    $results['linkedin_' . $idx] = [
+                        'platform' => 'linkedin',
+                        'account' => $accountName,
+                        'status' => 'skipped',
+                        'reason' => 'No access token or refresh token available',
+                    ];
+                    continue;
+                }
+                $probeResult = $this->probeLinkedInTokenExpiry($accessToken);
+                $liAccount['token_last_refreshed'] = date('Y-m-d H:i:s');
+                $liChanged = true;
+                if ($probeResult === null) {
+                    // Token is valid, estimate expiry from stored date or set unknown
+                    $liAccount['token_expiry_source'] = 'probe';
+                    $results['linkedin_' . $idx] = [
+                        'platform' => 'linkedin',
+                        'account' => $accountName,
+                        'status' => 'valid',
+                        'reason' => 'Access token is valid (no refresh token available)',
+                    ];
+                } else {
+                    $liAccount['token_expiry_source'] = 'invalid';
+                    $liAccount['token_expiry_date'] = $probeResult;
+                    $results['linkedin_' . $idx] = [
+                        'platform' => 'linkedin',
+                        'account' => $accountName,
+                        'status' => 'failed',
+                        'error' => 'Access token expired or invalid — re-authenticate via OAuth',
+                    ];
+                }
+                continue;
+            }
+
+            if (empty($clientId) || empty($clientSecret)) {
                 $results['linkedin_' . $idx] = [
                     'platform' => 'linkedin',
                     'account' => $accountName,
                     'status' => 'skipped',
-                    'reason' => 'Missing OAuth credentials (client_id, client_secret, or refresh_token)',
+                    'reason' => 'Missing client_id or client_secret for refresh',
                 ];
                 continue;
             }
