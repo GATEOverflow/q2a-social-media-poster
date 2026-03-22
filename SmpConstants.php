@@ -65,8 +65,8 @@ class SmpConstants
         return [
             self::PLATFORM_TELEGRAM => [
                 'name' => 'Telegram',
-                'fields' => ['bot_token', 'chat_id'],
-                'labels' => ['Bot Token', 'Chat ID'],
+                'fields' => ['bot_token', 'chat_id', 'message_thread_id'],
+                'labels' => ['Bot Token', 'Chat ID', 'Topic Thread ID (optional)'],
             ],
             self::PLATFORM_FACEBOOK => [
                 'name' => 'Facebook',

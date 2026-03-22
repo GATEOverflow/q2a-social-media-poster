@@ -326,6 +326,7 @@ class SmpPoster
     {
         $botToken = $creds['bot_token'] ?? '';
         $chatId = $creds['chat_id'] ?? '';
+        $messageThreadId = $creds['message_thread_id'] ?? '';
 
         if (empty($botToken) || empty($chatId)) {
             return ['success' => false, 'error' => 'Missing Telegram credentials'];
@@ -347,6 +348,11 @@ class SmpPoster
                 'text' => $message,
                 'parse_mode' => 'HTML',
             ];
+        }
+
+        // Support Telegram group topics (forum mode)
+        if (!empty($messageThreadId)) {
+            $postData['message_thread_id'] = (int)$messageThreadId;
         }
 
         $ch = curl_init();
