@@ -201,6 +201,14 @@ class SmpAdmin
                         $message = $this->testQotdPost($platformId, $idx, $account);
                         break 2;
                     }
+                    if (qa_clicked('smp_preview_quote_' . $platformId . '_' . $idx)) {
+                        $message = $this->previewQuoteImage();
+                        break 2;
+                    }
+                    if (qa_clicked('smp_preview_qotd_' . $platformId . '_' . $idx)) {
+                        $message = $this->previewQotdImage();
+                        break 2;
+                    }
                 }
             }
         }
@@ -904,7 +912,11 @@ class SmpAdmin
                             . ' style="background:#ff9800;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">📤 Test Quote</button>'
                             . ' <button type="submit" name="smp_test_qotd_' . $platformId . '_' . $idx
                             . '" onclick="return confirm(\'Send a test Question of the Day post to this account?\')"'
-                            . ' style="background:#6a1b9a;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">📝 Test QOTD</button>',
+                            . ' style="background:#6a1b9a;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">📝 Test QOTD</button>'
+                            . ' <button type="submit" name="smp_preview_quote_' . $platformId . '_' . $idx
+                            . '" style="background:#00897b;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">👁 Preview Quote</button>'
+                            . ' <button type="submit" name="smp_preview_qotd_' . $platformId . '_' . $idx
+                            . '" style="background:#00897b;color:#fff;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;margin-left:4px;">👁 Preview QOTD</button>',
                     ];
                 }
             }
@@ -1599,14 +1611,12 @@ class SmpAdmin
 
         $messageText = "📝 Question of the Day\n\nQ: " . $title . "\n\n" . $bodySnippet;
 
-        // Extract options
-        $text = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
-        if (preg_match_all('/(?:^|\n)\s*(?:\(?([A-Da-d])\)\.?|([A-Da-d])[\)\.]\s*)(.+)/m', $text, $matches, PREG_SET_ORDER)) {
+        // Extract options from HTML <ol><li> structure
+        $optionLabels = $this->extractOptionsFromHtml($content);
+        if (!empty($optionLabels)) {
             $messageText .= "\n\n";
-            foreach ($matches as $match) {
-                $letter = strtoupper($match[1] ?: $match[2]);
-                $optionText = trim($match[3]);
-                $messageText .= $letter . ') ' . mb_substr($optionText, 0, 100) . "\n";
+            foreach ($optionLabels as $label) {
+                $messageText .= $label . "\n";
             }
         }
 
@@ -1656,6 +1666,101 @@ class SmpAdmin
         );
         $row = qa_db_read_one_assoc($result, true);
         return $row ?: null;
+    }
+
+    /**
+     * Extract options from HTML <ol><li> content with proper A/B/C/D labels.
+     */
+    private function extractOptionsFromHtml(string $content): array
+    {
+        $options = [];
+
+        if (preg_match('/<ol\b[^>]*>(.*?)<\/ol>/is', $content, $olMatch)) {
+            $olTag = $olMatch[0];
+            $style = 'upper-alpha';
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+                $style = strtolower(trim($sm[1], "; \t"));
+            }
+
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olMatch[1], $liMatches);
+            if (!empty($liMatches[1])) {
+                $labels = ['upper-alpha'=>'A','upper-latin'=>'A','lower-alpha'=>'a','lower-latin'=>'a'];
+                foreach ($liMatches[1] as $i => $liContent) {
+                    if (isset($labels[$style]) || $style === 'upper-alpha') {
+                        $label = chr((($style === 'lower-alpha' || $style === 'lower-latin') ? 97 : 65) + $i);
+                    } elseif ($style === 'decimal') {
+                        $label = (string)($i + 1);
+                    } else {
+                        $label = chr(65 + $i);
+                    }
+                    $optionText = trim(html_entity_decode(strip_tags($liContent), ENT_QUOTES, 'UTF-8'));
+                    $options[] = $label . ') ' . mb_substr($optionText, 0, 100);
+                }
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Preview Quote of the Day image (generate but don't post).
+     */
+    private function previewQuoteImage(): string
+    {
+        require_once $this->directory . 'SmpPoster.php';
+        require_once $this->directory . 'SmpImageGenerator.php';
+
+        $poster = new SmpPoster($this->directory);
+
+        $quote = $poster->getTodayQuote();
+        if (empty($quote)) {
+            $quote = $poster->openaiGenerateMessage(
+                'Generate a motivational Quote of the Day for ' . date('l, F j, Y'),
+                qa_opt(SmpConstants::OPT_QUOTE_PROMPT) ?: 'Generate a unique, inspiring motivational quote suitable for students preparing for competitive exams. Include the quote and attribute it to a famous person or mark it as anonymous. Format it nicely for social media with emojis. Add #QuoteOfTheDay #Motivation hashtags.'
+            );
+        }
+        if (empty($quote)) {
+            return '❌ Preview failed: Could not get a quote.';
+        }
+
+        $imageGen = new SmpImageGenerator();
+        $imageUrl = $imageGen->generateQuoteImage($quote);
+
+        if (empty($imageUrl)) {
+            return '❌ Preview failed: Image generation failed.';
+        }
+
+        return '👁 Quote preview generated: <a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" target="_blank"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" style="max-width:400px;max-height:400px;vertical-align:middle;border:1px solid #ccc;border-radius:4px;margin:8px 0;" /></a>';
+    }
+
+    /**
+     * Preview Question of the Day image (generate but don't post).
+     */
+    private function previewQotdImage(): string
+    {
+        require_once $this->directory . 'SmpImageGenerator.php';
+
+        $question = $this->fetchRandomMcqForTest();
+        if (!$question) {
+            return '❌ Preview failed: No eligible MCQ question found.';
+        }
+
+        $title = $question['title'];
+        $content = $question['content'];
+        $postId = (int)$question['postid'];
+
+        $imageGen = new SmpImageGenerator();
+        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
+
+        if (empty($imageUrl)) {
+            return '❌ Preview failed: Image generation failed.';
+        }
+
+        return '👁 QOTD preview (Post #' . $postId . '): <a href="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" target="_blank"><img src="' . htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8')
+            . '" style="max-width:400px;max-height:400px;vertical-align:middle;border:1px solid #ccc;border-radius:4px;margin:8px 0;" /></a>';
     }
 
     private function saveGeneralSettings(): void

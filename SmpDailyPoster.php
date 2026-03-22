@@ -290,9 +290,30 @@ class SmpDailyPoster
     private function extractOptions(string $content): array
     {
         $options = [];
-        $text = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
 
-        // Match patterns like "A) ...", "A. ...", "(A) ...", "a) ..."
+        // Try to extract from HTML <ol><li> structure first
+        if (preg_match('/<ol\b[^>]*>(.*?)<\/ol>/is', $content, $olMatch)) {
+            $olTag = $olMatch[0];
+
+            // Determine list style
+            $style = 'upper-alpha';
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+                $style = strtolower(trim($sm[1], "; \t"));
+            }
+
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olMatch[1], $liMatches);
+            if (!empty($liMatches[1])) {
+                foreach ($liMatches[1] as $i => $liContent) {
+                    $label = $this->getOptionLabel($style, $i);
+                    $optionText = trim(html_entity_decode(strip_tags($liContent), ENT_QUOTES, 'UTF-8'));
+                    $options[] = $label . ') ' . mb_substr($optionText, 0, 100);
+                }
+                return $options;
+            }
+        }
+
+        // Fallback: match plain text patterns like "A) ...", "(A) ..."
+        $text = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
         if (preg_match_all('/(?:^|\n)\s*(?:\(?([A-Da-d])\)\.?|([A-Da-d])[\)\.]\s*)(.+)/m', $text, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $letter = strtoupper($match[1] ?: $match[2]);
@@ -302,5 +323,28 @@ class SmpDailyPoster
         }
 
         return $options;
+    }
+
+    /**
+     * Get option label based on list style type.
+     */
+    private function getOptionLabel(string $style, int $index): string
+    {
+        switch ($style) {
+            case 'upper-alpha': case 'upper-latin':
+                return chr(65 + $index);
+            case 'lower-alpha': case 'lower-latin':
+                return chr(97 + $index);
+            case 'upper-roman':
+                $r = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+                return $r[$index] ?? (string)($index + 1);
+            case 'lower-roman':
+                $r = ['i','ii','iii','iv','v','vi','vii','viii','ix','x'];
+                return $r[$index] ?? (string)($index + 1);
+            case 'decimal':
+                return (string)($index + 1);
+            default:
+                return chr(65 + $index);
+        }
     }
 }

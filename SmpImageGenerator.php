@@ -55,9 +55,17 @@ class SmpImageGenerator
             return null;
         }
 
-        // Strip HTML tags and decode entities
+        // Pre-process: convert MathJax and extract options before stripping HTML
+        $text = $this->convertMathJaxToUnicode($text);
+        $title = $this->convertMathJaxToUnicode($title);
+        $text = $this->convertHtmlOptionsToText($text);
+
+        // Strip remaining HTML tags and decode entities
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
         $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
+
+        // Clean up excessive whitespace
+        $text = preg_replace('/\n{3,}/', "\n\n", trim($text));
 
         $img = imagecreatetruecolor($this->width, $this->height);
         if (!$img) {
@@ -194,6 +202,206 @@ class SmpImageGenerator
     }
 
     /**
+     * Convert HTML ordered lists (<ol><li>) to text with A), B), C) labels.
+     * Handles list-style-type: upper-alpha, lower-alpha, decimal, roman.
+     */
+    private function convertHtmlOptionsToText(string $html): string
+    {
+        // Match <ol ...> ... </ol> blocks
+        return preg_replace_callback('/<ol\b[^>]*>(.*?)<\/ol>/is', function ($olMatch) {
+            $olTag = $olMatch[0];
+            $olContent = $olMatch[1];
+
+            // Determine starting style
+            $style = 'upper-alpha'; // default
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+                $style = strtolower(trim($sm[1], "; \t"));
+            }
+
+            // Extract <li> items
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olContent, $liMatches);
+            if (empty($liMatches[1])) {
+                return $olMatch[0]; // no list items found, return as-is
+            }
+
+            $result = "\n";
+            foreach ($liMatches[1] as $i => $liContent) {
+                $label = $this->getOptionLabel($style, $i);
+                $liText = trim($liContent);
+                $result .= $label . ') ' . $liText . "\n";
+            }
+            return $result;
+        }, $html);
+    }
+
+    /**
+     * Get the option label for a given index based on list style.
+     */
+    private function getOptionLabel(string $style, int $index): string
+    {
+        switch ($style) {
+            case 'upper-alpha':
+            case 'upper-latin':
+                return chr(65 + $index); // A, B, C, D
+            case 'lower-alpha':
+            case 'lower-latin':
+                return chr(97 + $index); // a, b, c, d
+            case 'upper-roman':
+                $romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+                return $romans[$index] ?? (string)($index + 1);
+            case 'lower-roman':
+                $romans = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'];
+                return $romans[$index] ?? (string)($index + 1);
+            case 'decimal':
+                return (string)($index + 1);
+            default:
+                return chr(65 + $index); // default to A, B, C, D
+        }
+    }
+
+    /**
+     * Convert MathJax/LaTeX notation to Unicode approximation for image rendering.
+     * Handles $...$ inline math and common LaTeX commands.
+     */
+    private function convertMathJaxToUnicode(string $text): string
+    {
+        // Process inline math: $...$ (but not $$...$$)
+        $text = preg_replace_callback('/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/s', function ($m) {
+            return $this->latexToUnicode($m[1]);
+        }, $text);
+
+        // Process \(...\) inline math
+        $text = preg_replace_callback('/\\\\\((.+?)\\\\\)/s', function ($m) {
+            return $this->latexToUnicode($m[1]);
+        }, $text);
+
+        return $text;
+    }
+
+    /**
+     * Convert a LaTeX math expression to a Unicode approximation.
+     */
+    private function latexToUnicode(string $latex): string
+    {
+        $s = trim($latex);
+
+        // Fractions: \frac{a}{b} → a/b
+        $s = preg_replace_callback('/\\\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/', function ($m) {
+            $num = $this->latexToUnicode($m[1]);
+            $den = $this->latexToUnicode($m[2]);
+            return '(' . $num . '/' . $den . ')';
+        }, $s);
+
+        // Binomial: \binom{n}{k} → C(n,k)
+        $s = preg_replace_callback('/\\\\binom\s*\{([^{}]+)\}\s*\{([^{}]+)\}/', function ($m) {
+            return 'C(' . $this->latexToUnicode($m[1]) . ',' . $this->latexToUnicode($m[2]) . ')';
+        }, $s);
+
+        // Superscript: x^{n} or x^n → xⁿ (common cases)
+        $superMap = ['0'=>'⁰','1'=>'¹','2'=>'²','3'=>'³','4'=>'⁴','5'=>'⁵','6'=>'⁶','7'=>'⁷','8'=>'⁸','9'=>'⁹',
+            'n'=>'ⁿ','i'=>'ⁱ','+'=>'⁺','-'=>'⁻','('=>'⁽',')'=>'⁾','*'=>'*'];
+        $s = preg_replace_callback('/\^\{([^{}]+)\}/', function ($m) use ($superMap) {
+            $exp = $m[1];
+            // If it's a simple expression, use Unicode superscripts
+            $result = '';
+            $chars = preg_split('//u', $exp, -1, PREG_SPLIT_NO_EMPTY);
+            $allMapped = true;
+            foreach ($chars as $c) {
+                if (isset($superMap[$c])) {
+                    $result .= $superMap[$c];
+                } else {
+                    $allMapped = false;
+                    break;
+                }
+            }
+            return $allMapped ? $result : '^(' . $exp . ')';
+        }, $s);
+        // Single char superscript: x^2 → x²
+        $s = preg_replace_callback('/\^([0-9n])/', function ($m) use ($superMap) {
+            return $superMap[$m[1]] ?? '^' . $m[1];
+        }, $s);
+
+        // Subscript: x_{n} or x_n → x_n (keep as-is, Unicode subscripts limited)
+        $subMap = ['0'=>'₀','1'=>'₁','2'=>'₂','3'=>'₃','4'=>'₄','5'=>'₅','6'=>'₆','7'=>'₇','8'=>'₈','9'=>'₉',
+            'a'=>'ₐ','e'=>'ₑ','i'=>'ᵢ','n'=>'ₙ','o'=>'ₒ','r'=>'ᵣ','s'=>'ₛ','t'=>'ₜ','u'=>'ᵤ','x'=>'ₓ',
+            '+'=>'₊','-'=>'₋','('=>'₍',')'=>'₎'];
+        $s = preg_replace_callback('/_\{([^{}]+)\}/', function ($m) use ($subMap) {
+            $sub = $m[1];
+            $result = '';
+            $chars = preg_split('//u', $sub, -1, PREG_SPLIT_NO_EMPTY);
+            $allMapped = true;
+            foreach ($chars as $c) {
+                if (isset($subMap[$c])) {
+                    $result .= $subMap[$c];
+                } else {
+                    $allMapped = false;
+                    break;
+                }
+            }
+            return $allMapped ? $result : '_(' . $sub . ')';
+        }, $s);
+        $s = preg_replace_callback('/_([0-9])/', function ($m) use ($subMap) {
+            return $subMap[$m[1]] ?? '_' . $m[1];
+        }, $s);
+
+        // Square root: \sqrt{x} → √(x), \sqrt[n]{x} → ⁿ√(x)
+        $s = preg_replace_callback('/\\\\sqrt\[([^\]]+)\]\{([^{}]+)\}/', function ($m) {
+            return $this->latexToUnicode($m[1]) . '√(' . $this->latexToUnicode($m[2]) . ')';
+        }, $s);
+        $s = preg_replace('/\\\\sqrt\{([^{}]+)\}/', '√($1)', $s);
+
+        // Greek letters
+        $greek = [
+            '\\alpha'=>'α', '\\beta'=>'β', '\\gamma'=>'γ', '\\delta'=>'δ', '\\epsilon'=>'ε',
+            '\\zeta'=>'ζ', '\\eta'=>'η', '\\theta'=>'θ', '\\iota'=>'ι', '\\kappa'=>'κ',
+            '\\lambda'=>'λ', '\\mu'=>'μ', '\\nu'=>'ν', '\\xi'=>'ξ', '\\pi'=>'π',
+            '\\rho'=>'ρ', '\\sigma'=>'σ', '\\tau'=>'τ', '\\upsilon'=>'υ', '\\phi'=>'φ',
+            '\\chi'=>'χ', '\\psi'=>'ψ', '\\omega'=>'ω',
+            '\\Gamma'=>'Γ', '\\Delta'=>'Δ', '\\Theta'=>'Θ', '\\Lambda'=>'Λ',
+            '\\Xi'=>'Ξ', '\\Pi'=>'Π', '\\Sigma'=>'Σ', '\\Phi'=>'Φ', '\\Psi'=>'Ψ', '\\Omega'=>'Ω',
+        ];
+        $s = str_replace(array_keys($greek), array_values($greek), $s);
+
+        // Common math symbols
+        $symbols = [
+            '\\times'=>'×', '\\div'=>'÷', '\\pm'=>'±', '\\mp'=>'∓',
+            '\\leq'=>'≤', '\\geq'=>'≥', '\\neq'=>'≠', '\\approx'=>'≈',
+            '\\equiv'=>'≡', '\\sim'=>'∼', '\\propto'=>'∝',
+            '\\infty'=>'∞', '\\partial'=>'∂', '\\nabla'=>'∇',
+            '\\forall'=>'∀', '\\exists'=>'∃', '\\neg'=>'¬',
+            '\\in'=>'∈', '\\notin'=>'∉', '\\subset'=>'⊂', '\\supset'=>'⊃',
+            '\\subseteq'=>'⊆', '\\supseteq'=>'⊇',
+            '\\cup'=>'∪', '\\cap'=>'∩', '\\emptyset'=>'∅',
+            '\\rightarrow'=>'→', '\\leftarrow'=>'←', '\\Rightarrow'=>'⇒', '\\Leftarrow'=>'⇐',
+            '\\leftrightarrow'=>'↔', '\\Leftrightarrow'=>'⇔',
+            '\\cdot'=>'·', '\\ldots'=>'…', '\\cdots'=>'⋯', '\\vdots'=>'⋮',
+            '\\sum'=>'Σ', '\\prod'=>'Π', '\\int'=>'∫',
+            '\\lfloor'=>'⌊', '\\rfloor'=>'⌋', '\\lceil'=>'⌈', '\\rceil'=>'⌉',
+            '\\land'=>'∧', '\\lor'=>'∨', '\\oplus'=>'⊕', '\\otimes'=>'⊗',
+            '\\le'=>'≤', '\\ge'=>'≥', '\\ne'=>'≠',
+            '\\to'=>'→', '\\gets'=>'←',
+        ];
+        $s = str_replace(array_keys($symbols), array_values($symbols), $s);
+
+        // \text{...} and \textbf{...} and \mathrm{...} — just extract content
+        $s = preg_replace('/\\\\(?:text|textbf|textrm|mathrm|mathbf|mathit|operatorname)\{([^{}]+)\}/', '$1', $s);
+
+        // \left and \right — remove
+        $s = str_replace(['\\left', '\\right'], '', $s);
+
+        // \{ and \} → { and }
+        $s = str_replace(['\\{', '\\}', '\\,', '\\;', '\\:', '\\!', '\\ '], ['{', '}', ' ', ' ', ' ', '', ' '], $s);
+
+        // Remove remaining \command patterns (unknown commands)
+        $s = preg_replace('/\\\\[a-zA-Z]+/', '', $s);
+
+        // Clean up extra spaces
+        $s = preg_replace('/\s+/', ' ', trim($s));
+
+        return $s;
+    }
+
+    /**
      * Load an image from file based on type.
      */
     private function loadImage(string $path, int $type)
@@ -304,8 +512,11 @@ class SmpImageGenerator
             $rawQuote = trim(substr($rawQuote, 0, -strlen($m[0])));
         }
 
-        // Clean up surrounding quotes
-        $rawQuote = trim($rawQuote, " \t\n\r\0\x0B\"'\xe2\x80\x9c\xe2\x80\x9d\xe2\x80\x98\xe2\x80\x99");
+        // Clean up surrounding quotes (plain and Unicode smart quotes)
+        // Remove all leading/trailing quote characters — the image adds decorative ones
+        $rawQuote = preg_replace('/^[\s"\'\x{201C}\x{201D}\x{2018}\x{2019}\x{00AB}\x{00BB}]+/u', '', $rawQuote);
+        $rawQuote = preg_replace('/[\s"\'\x{201C}\x{201D}\x{2018}\x{2019}\x{00AB}\x{00BB}]+$/u', '', $rawQuote);
+        $rawQuote = trim($rawQuote);
 
         // --- Large opening quotation mark ---
         $quoteMarkSize = 90;
