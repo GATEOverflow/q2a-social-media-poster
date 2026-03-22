@@ -81,10 +81,36 @@ class SmpDailyPoster
             return;
         }
 
-        // Fetch a random MCQ question
-        $question = $this->fetchRandomMcqQuestion();
+        // Fetch a random MCQ question (retry if image doesn't fit)
+        $question = null;
+        $imageUrl = null;
+        $triedPostIds = [];
+        require_once $this->directory . 'SmpImageGenerator.php';
+        $imageGen = new SmpImageGenerator();
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $question = $this->fetchRandomMcqQuestion($triedPostIds);
+            if (!$question) {
+                break;
+            }
+
+            $imageUrl = $imageGen->generateFromText(
+                $question['content'],
+                'Question of the Day: ' . $question['title'],
+                (int)$question['postid']
+            );
+
+            if ($imageUrl !== null) {
+                break; // Image fits
+            }
+
+            // Content too large for image — try another question
+            $triedPostIds[] = (int)$question['postid'];
+            $question = null;
+        }
+
         if (!$question) {
-            $poster->reportFailure('QOTD: No eligible MCQ question found');
+            $poster->reportFailure('QOTD: No eligible MCQ question found (tried ' . count($triedPostIds) . ' questions)');
             return;
         }
 
@@ -114,12 +140,6 @@ class SmpDailyPoster
             $messagePrefix,
             'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
         );
-
-        // Generate QOTD image (used across all platforms)
-        $imageUrl = null;
-        require_once $this->directory . 'SmpImageGenerator.php';
-        $imageGen = new SmpImageGenerator();
-        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
 
         $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, ['title' => $title]);
 
@@ -207,7 +227,7 @@ class SmpDailyPoster
      *
      * @return array|null Question row or null
      */
-    private function fetchRandomMcqQuestion(): ?array
+    private function fetchRandomMcqQuestion(array $excludePostIds = []): ?array
     {
         $lastPostId = (int)qa_opt(SmpConstants::OPT_QOTD_LAST_POSTID);
         $excludeTags = qa_opt(SmpConstants::OPT_QOTD_EXCLUDE_TAGS);
@@ -238,17 +258,23 @@ class SmpDailyPoster
             }
         }
 
-        // Exclude last posted question
-        $excludeWhere = '';
+        // Exclude last posted question and any previously tried post IDs
+        $excludeIds = $excludePostIds;
         if ($lastPostId > 0) {
-            $excludeWhere = ' AND p.postid != ' . $lastPostId;
+            $excludeIds[] = $lastPostId;
+        }
+        $excludeWhere = '';
+        if (!empty($excludeIds)) {
+            $excludeWhere = ' AND p.postid NOT IN (' . implode(',', array_map('intval', $excludeIds)) . ')';
         }
 
+        // Limit content length to avoid questions that won't fit in the image
         $query = "SELECT p.postid, p.title, p.content, p.tags, a.answer_str "
             . "FROM ^posts p "
             . "JOIN ^ec_answers a ON p.postid = a.postid "
             . "WHERE p.type = 'Q' "
             . "AND a.answer_str != '' "
+            . "AND LENGTH(p.content) < 2000 "
             . "AND " . $tagWhere
             . $catWhere
             . $excludeWhere

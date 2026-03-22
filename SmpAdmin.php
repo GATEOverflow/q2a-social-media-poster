@@ -1598,15 +1598,38 @@ class SmpAdmin
         $poster = new SmpPoster($this->directory);
         $accountName = $account['name'] ?? ('Account ' . ($index + 1));
 
-        // Fetch a random MCQ question (same logic as SmpDailyPoster)
-        $question = $this->fetchRandomMcqForTest();
+        // Fetch a random MCQ question, retrying if content overflows the image
+        $question = null;
+        $imageUrl = null;
+        $imageGen = new SmpImageGenerator();
+        $triedPostIds = [];
+
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            $candidate = $this->fetchRandomMcqForTest($triedPostIds);
+            if (!$candidate) {
+                break;
+            }
+
+            $imageUrl = $imageGen->generateFromText(
+                $candidate['content'],
+                'Question of the Day: ' . $candidate['title'],
+                (int)$candidate['postid']
+            );
+
+            if ($imageUrl !== null) {
+                $question = $candidate;
+                break;
+            }
+
+            $triedPostIds[] = (int)$candidate['postid'];
+        }
+
         if (!$question) {
-            return '❌ Test QOTD failed: No eligible MCQ question found in the database.';
+            return '❌ Test QOTD failed: No eligible MCQ question found that fits in the image (tried ' . count($triedPostIds) . ' questions).';
         }
 
         $postId = (int)$question['postid'];
         $title = $question['title'];
-        $content = $question['content'];
         $url = qa_q_path($postId, $title, true);
 
         // Caption: just title + link (image has the full question content)
@@ -1619,10 +1642,6 @@ class SmpAdmin
             $messageText,
             'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
         );
-
-        // Generate image for all platforms
-        $imageGen = new SmpImageGenerator();
-        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
 
         $account['_platform'] = $platformId;
         $platforms = SmpConstants::getPlatforms();
@@ -1640,17 +1659,24 @@ class SmpAdmin
     /**
      * Fetch a random MCQ question for test posting.
      */
-    private function fetchRandomMcqForTest(): ?array
+    private function fetchRandomMcqForTest(array $excludePostIds = []): ?array
     {
+        $excludeWhere = '';
+        if (!empty($excludePostIds)) {
+            $excludeWhere = ' AND p.postid NOT IN (' . implode(',', array_map('intval', $excludePostIds)) . ')';
+        }
+
         $result = qa_db_query_sub(
             "SELECT p.postid, p.title, p.content, p.tags "
             . "FROM ^posts p "
             . "JOIN ^ec_answers a ON p.postid = a.postid "
             . "WHERE p.type = 'Q' "
             . "AND a.answer_str != '' "
+            . "AND LENGTH(p.content) < 2000 "
             . "AND p.tags NOT LIKE '%numerical-answers%' "
             . "AND p.tags NOT LIKE '%multiple-selects%' "
-            . "ORDER BY RAND() LIMIT 1"
+            . $excludeWhere
+            . " ORDER BY RAND() LIMIT 1"
         );
         $row = qa_db_read_one_assoc($result, true);
         return $row ?: null;

@@ -86,7 +86,36 @@ class SmpImageGenerator
         $tempPng = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.png';
         file_put_contents($tempHtml, $html);
 
-        // Run wkhtmltoimage (no JS needed — math is pre-rendered)
+        // First pass: render at auto height to measure natural content height
+        $measurePng = tempnam(sys_get_temp_dir(), 'smp_measure_') . '.png';
+        $measureCmd = sprintf(
+            'wkhtmltoimage --enable-local-file-access --disable-javascript --width %d --quality 50 --disable-smart-width --quiet %s %s 2>&1',
+            $w,
+            escapeshellarg($tempHtml),
+            escapeshellarg($measurePng)
+        );
+        exec($measureCmd, $mOut, $mExit);
+
+        if ($mExit === 0 && file_exists($measurePng)) {
+            $measureImg = @imagecreatefrompng($measurePng);
+            if ($measureImg) {
+                $naturalHeight = imagesy($measureImg);
+                imagedestroy($measureImg);
+                @unlink($measurePng);
+
+                // If content exceeds the target height, it won't fit — return null
+                if ($naturalHeight > $h + 50) {
+                    @unlink($tempHtml);
+                    return null;
+                }
+            } else {
+                @unlink($measurePng);
+            }
+        } else {
+            @unlink($measurePng);
+        }
+
+        // Run wkhtmltoimage at fixed dimensions (no JS needed — math is pre-rendered)
         $cmd = sprintf(
             'wkhtmltoimage --enable-local-file-access --disable-javascript --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
             $w, $h,
