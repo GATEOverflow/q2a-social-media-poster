@@ -65,7 +65,6 @@ class SmpImageGenerator
         $h = $this->height;
 
         $siteName = htmlspecialchars(qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
-        $siteUrl = htmlspecialchars(rtrim(qa_opt('site_url') ?: '', '/'), ENT_QUOTES, 'UTF-8');
         $siteHost = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
 
         // Build options HTML
@@ -79,31 +78,30 @@ class SmpImageGenerator
         // Build the full HTML page
         $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h);
 
+        // Pre-render math server-side via Node.js KaTeX
+        $html = $this->renderMathServerSide($html);
+
         // Write to temp file
         $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
         $tempPng = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.png';
         file_put_contents($tempHtml, $html);
 
-        // Run wkhtmltoimage
+        // Run wkhtmltoimage (no JS needed — math is pre-rendered)
         $cmd = sprintf(
-            'wkhtmltoimage --enable-javascript --javascript-delay 3000 --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
+            'wkhtmltoimage --disable-javascript --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
             $w, $h,
             escapeshellarg($tempHtml),
             escapeshellarg($tempPng)
         );
 
         exec($cmd, $output, $exitCode);
-
-        // Clean up temp HTML
         @unlink($tempHtml);
 
         if ($exitCode !== 0 || !file_exists($tempPng)) {
             @unlink($tempPng);
-            // Fall back to simple GD rendering
             return $this->generateFromTextGd($text, $title, $postId);
         }
 
-        // Load with GD and re-save compressed
         $img = imagecreatefrompng($tempPng);
         @unlink($tempPng);
 
@@ -115,47 +113,82 @@ class SmpImageGenerator
     }
 
     /**
+     * Pre-render $...$ and $$...$$ math to HTML using Node.js KaTeX.
+     */
+    private function renderMathServerSide(string $html): string
+    {
+        $script = __DIR__ . '/katex-render.js';
+        if (!file_exists($script)) {
+            return $html;
+        }
+
+        $proc = proc_open(
+            ['node', $script],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes
+        );
+
+        if (!is_resource($proc)) {
+            return $html;
+        }
+
+        fwrite($pipes[0], $html);
+        fclose($pipes[0]);
+
+        $output = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        $exitCode = proc_close($proc);
+        return ($exitCode === 0 && !empty($output)) ? $output : $html;
+    }
+
+    /**
      * Build the HTML page for QOTD image rendering.
      */
     private function buildQotdHtml(string $questionHtml, string $optionsDivs, string $siteName, string $siteHost, int $w, int $h): string
     {
+        // Use local KaTeX CSS file (fonts load relative to it)
+        $katexCssPath = __DIR__ . '/node_modules/katex/dist/katex.min.css';
+        $katexCssUrl = file_exists($katexCssPath) ? 'file://' . $katexCssPath : 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
+
         return '<!DOCTYPE html>
 <html><head><meta charset="utf-8">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="' . $katexCssUrl . '">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:' . $w . 'px;height:' . $h . 'px;background:linear-gradient(180deg,#0f172a 0%,#1e3a5f 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#e8eaed;position:relative;overflow:hidden}
 .accent-bar{position:absolute;top:0;left:0;right:0;height:6px;background:#3B82F6}
 .circle1{position:absolute;top:-20px;right:-20px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05)}
 .circle2{position:absolute;bottom:-20px;left:-20px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.05)}
-.content{padding:50px 60px 100px;display:flex;flex-direction:column;height:100%}
-.badge{align-self:center;background:rgba(59,130,246,0.35);color:#fff;font-size:18px;font-weight:700;letter-spacing:2.5px;padding:10px 28px;border-radius:20px;margin-bottom:28px}
+.content{padding:50px 60px 100px;position:relative;z-index:1}
+.badge{text-align:center;margin-bottom:28px}
+.badge span{display:inline-block;background:rgba(59,130,246,0.35);color:#fff;font-size:18px;font-weight:700;letter-spacing:2.5px;padding:10px 28px;border-radius:20px}
 .question-card{background:rgba(255,255,255,0.08);border-radius:16px;padding:32px 36px;border-left:5px solid #3B82F6;margin-bottom:24px}
 .question-card p,.question-card{font-size:28px;line-height:1.55;color:#e8eaed}
 .question-card ol,.question-card ul{margin:12px 0 12px 28px;font-size:26px;line-height:1.5;color:#dadce0}
 .question-card ol li,.question-card ul li{margin-bottom:6px}
 .question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:rgba(255,255,255,0.06);border-radius:8px;padding:2px 8px;font-size:24px;color:#93c5fd}
-.question-card pre{display:block;padding:14px 18px;margin:12px 0;overflow-x:auto;white-space:pre-wrap}
+.question-card pre{display:block;padding:14px 18px;margin:12px 0;overflow-x:hidden;white-space:pre-wrap}
 .question-card table{border-collapse:collapse;margin:12px 0;font-size:24px}
 .question-card td,.question-card th{border:1px solid rgba(255,255,255,0.15);padding:8px 14px}
 .question-card img{max-width:100%;border-radius:8px}
-.options{display:flex;flex-direction:column;gap:14px;flex:1}
-.option{background:rgba(255,255,255,0.06);border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:20px}
-.option-label{width:44px;height:44px;min-width:44px;border-radius:50%;background:#3B82F6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#fff}
-.option-text{font-size:24px;line-height:1.45;color:#dadce0}
-.branding{position:absolute;bottom:30px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:15px}
-.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.7)}
-.branding .url{font-size:15px;color:rgba(255,255,255,0.4)}
-.katex{font-size:1.1em!important}
+.options{margin:0}
+.option{background:rgba(255,255,255,0.06);border-radius:14px;padding:18px 24px;margin-bottom:14px;display:table;width:100%}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#3B82F6;text-align:center;vertical-align:middle;font-weight:700;font-size:20px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:24px;line-height:1.45;color:#dadce0}
+.branding{position:absolute;bottom:30px;left:60px;right:60px;border-top:1px solid rgba(255,255,255,0.15);padding-top:15px}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.7);float:left}
+.branding .url{font-size:15px;color:rgba(255,255,255,0.4);float:right;line-height:28px}
+.katex{font-size:1.1em!important;color:#e8eaed}
 .katex-display{margin:0.3em 0!important}
+.katex .mfrac .frac-line{border-bottom-color:#e8eaed!important}
 </style></head><body>
 <div class="accent-bar"></div>
 <div class="circle1"></div>
 <div class="circle2"></div>
 <div class="content">
-<div class="badge">QUESTION OF THE DAY</div>
+<div class="badge"><span>QUESTION OF THE DAY</span></div>
 <div class="question-card">' . $questionHtml . '</div>
 <div class="options">' . $optionsDivs . '</div>
 </div>
@@ -163,15 +196,7 @@ body{width:' . $w . 'px;height:' . $h . 'px;background:linear-gradient(180deg,#0
 <span class="site">' . $siteName . '</span>
 <span class="url">' . $siteHost . '</span>
 </div>
-<script>
-document.addEventListener("DOMContentLoaded",function(){
-renderMathInElement(document.body,{delimiters:[
-{left:"$$",right:"$$",display:true},
-{left:"$",right:"$",display:false},
-{left:"\\\\(",right:"\\\\)",display:false},
-{left:"\\\\[",right:"\\\\]",display:true}
-],throwOnError:false});});
-</script></body></html>';
+</body></html>';
     }
 
     /**
