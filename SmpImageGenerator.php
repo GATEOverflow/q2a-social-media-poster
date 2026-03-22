@@ -181,44 +181,53 @@ class SmpImageGenerator
         $katexCssPath = __DIR__ . '/node_modules/katex/dist/katex.min.css';
         $katexCssUrl = file_exists($katexCssPath) ? 'file://' . $katexCssPath : 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css';
 
+        // Logo as base64 data URI for wkhtmltoimage compatibility
+        $logoTag = '';
+        if ($this->logoUrl && file_exists($this->logoUrl)) {
+            $logoData = base64_encode(file_get_contents($this->logoUrl));
+            $logoMime = mime_content_type($this->logoUrl) ?: 'image/png';
+            $logoTag = '<img class="logo" src="data:' . $logoMime . ';base64,' . $logoData . '" alt="">';
+        }
+
         return '<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <link rel="stylesheet" href="' . $katexCssUrl . '">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:' . $w . 'px;height:' . $h . 'px;background:#0f172a;background:-webkit-linear-gradient(top,#0f172a 0%,#1e3a5f 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#ffffff;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:6px;background:#3B82F6}
-.circle1{position:absolute;top:-20px;right:-20px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05)}
-.circle2{position:absolute;bottom:-20px;left:-20px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.05)}
-.content{padding:50px 60px 100px;position:relative;z-index:1}
-.badge{text-align:center;margin-bottom:28px}
-.badge span{display:inline-block;background:rgba(59,130,246,0.35);color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:12px 32px;border-radius:22px}
-.question-card{background:rgba(255,255,255,0.08);border-radius:16px;padding:36px 40px;border-left:5px solid #3B82F6;margin-bottom:28px}
-.question-card p,.question-card{font-size:34px;line-height:1.55;color:#ffffff}
-.question-card ol,.question-card ul{margin:14px 0 14px 32px;font-size:32px;line-height:1.5;color:#f0f0f0}
+body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#1a1a2e;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:120px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.header{text-align:center;padding:40px 60px 0;position:relative;z-index:1}
+.header .logo{height:52px;width:auto;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto}
+.badge{text-align:center;margin-bottom:24px;position:relative;z-index:1}
+.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:20px;font-weight:700;letter-spacing:2.5px;padding:10px 30px;border-radius:22px}
+.content{padding:0 60px 100px;position:relative;z-index:1}
+.question-card{background:#f8fafc;border-radius:16px;padding:36px 40px;border-left:5px solid #2563EB;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.question-card p,.question-card{font-size:34px;line-height:1.55;color:#1a1a2e}
+.question-card ol,.question-card ul{margin:14px 0 14px 32px;font-size:32px;line-height:1.5;color:#334155}
 .question-card ol li,.question-card ul li{margin-bottom:8px}
-.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:rgba(255,255,255,0.06);border-radius:8px;padding:3px 10px;font-size:30px;color:#93c5fd}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:8px;padding:3px 10px;font-size:30px;color:#3730a3}
 .question-card pre{display:block;padding:16px 20px;margin:14px 0;overflow-x:hidden;white-space:pre-wrap}
 .question-card table{border-collapse:collapse;margin:14px 0;font-size:30px}
-.question-card td,.question-card th{border:1px solid rgba(255,255,255,0.15);padding:10px 16px}
+.question-card td,.question-card th{border:1px solid #e2e8f0;padding:10px 16px}
 .question-card img{max-width:100%;border-radius:8px}
 .options{margin:0}
-.option{background:rgba(255,255,255,0.06);border-radius:14px;padding:20px 28px;margin-bottom:16px;display:table;width:100%}
-.option-label{display:table-cell;width:50px;height:50px;min-width:50px;border-radius:50%;background:#3B82F6;text-align:center;vertical-align:middle;font-weight:700;font-size:24px;color:#fff}
-.option-text{display:table-cell;vertical-align:middle;padding-left:24px;font-size:30px;line-height:1.45;color:#f0f0f0}
-.branding{position:absolute;bottom:30px;left:60px;right:60px;border-top:1px solid rgba(255,255,255,0.15);padding-top:15px}
-.branding .site{font-size:24px;font-weight:700;color:rgba(255,255,255,0.7);float:left}
-.branding .url{font-size:18px;color:rgba(255,255,255,0.4);float:right;line-height:32px}
-.katex{font-size:1.1em!important;color:#ffffff!important}
+.option{background:#f1f5f9;border-radius:14px;padding:20px 28px;margin-bottom:14px;display:table;width:100%;border:1px solid #e2e8f0}
+.option-label{display:table-cell;width:50px;height:50px;min-width:50px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:24px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:24px;font-size:30px;line-height:1.45;color:#334155}
+.branding{position:absolute;bottom:28px;left:60px;right:60px;border-top:2px solid #e2e8f0;padding-top:14px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:22px;font-weight:700;color:#64748b}
+.branding .url{font-size:18px;color:#94a3b8}
+.katex{font-size:1.1em!important;color:#1a1a2e!important}
 .katex-display{margin:0.3em 0!important}
-.katex .mfrac .frac-line{border-bottom-color:#ffffff!important}
-.katex .vlist-t2 .vlist-r .vlist .mord,.katex .mord,.katex .mrel,.katex .mbin,.katex .mpunct,.katex .mopen,.katex .mclose,.katex .minner{color:#ffffff!important}
+.katex .mfrac .frac-line{border-bottom-color:#1a1a2e!important}
+.katex .vlist-t2 .vlist-r .vlist .mord,.katex .mord,.katex .mrel,.katex .mbin,.katex .mpunct,.katex .mopen,.katex .mclose,.katex .minner{color:#1a1a2e!important}
 </style></head><body>
 <div class="accent-bar"></div>
-<div class="circle1"></div>
-<div class="circle2"></div>
-<div class="content">
+<div class="watermark">' . $siteName . '</div>
+<div class="header">' . $logoTag . '</div>
 <div class="badge"><span>QUESTION OF THE DAY</span></div>
+<div class="content">
 <div class="question-card">' . $questionHtml . '</div>
 <div class="options">' . $optionsDivs . '</div>
 </div>
