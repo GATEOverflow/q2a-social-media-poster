@@ -80,8 +80,8 @@ class SmpConstants
             ],
             self::PLATFORM_LINKEDIN => [
                 'name' => 'LinkedIn',
-                'fields' => ['access_token', 'author_urn'],
-                'labels' => ['Access Token', 'Author URN'],
+                'fields' => ['client_id', 'client_secret', 'refresh_token', 'author_urn'],
+                'labels' => ['Client ID', 'Client Secret', 'Refresh Token', 'Author URN'],
             ],
             self::PLATFORM_WHATSAPP => [
                 'name' => 'WhatsApp',

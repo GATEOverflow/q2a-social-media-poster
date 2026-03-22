@@ -451,9 +451,22 @@ class SmpPoster
     {
         $accessToken = $creds['access_token'] ?? '';
         $author = $creds['author_urn'] ?? '';
+        $clientId = $creds['client_id'] ?? '';
+        $clientSecret = $creds['client_secret'] ?? '';
+        $refreshToken = $creds['refresh_token'] ?? '';
+
+        // If we have OAuth credentials, get a fresh access token
+        if (!empty($clientId) && !empty($clientSecret) && !empty($refreshToken)) {
+            $refreshResult = $this->refreshLinkedInAccessToken($clientId, $clientSecret, $refreshToken);
+            if ($refreshResult['success']) {
+                $accessToken = $refreshResult['access_token'];
+            } else {
+                return ['success' => false, 'error' => 'Failed to refresh LinkedIn token: ' . ($refreshResult['error'] ?? 'Unknown error')];
+            }
+        }
 
         if (empty($accessToken) || empty($author)) {
-            return ['success' => false, 'error' => 'Missing LinkedIn credentials'];
+            return ['success' => false, 'error' => 'Missing LinkedIn credentials (access_token or author_urn)'];
         }
 
         $url = 'https://api.linkedin.com/v2/ugcPosts';
@@ -655,7 +668,34 @@ class SmpPoster
             return ['success' => false, 'error' => 'Failed to create media container: ' . $response, 'image_url' => $imageUrl];
         }
 
-        // Step 2: Publish
+        // Step 2: Wait for container to finish processing
+        $containerId = $mediaObj['id'];
+        $statusUrl = "https://graph.facebook.com/v20.0/" . urlencode($containerId)
+            . "?" . http_build_query(['fields' => 'status_code', 'access_token' => $accessToken]);
+        $maxAttempts = 10;
+        $pollInterval = 3; // seconds
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            sleep($pollInterval);
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $statusUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            $statusResponse = curl_exec($ch);
+            curl_close($ch);
+
+            $statusData = json_decode($statusResponse, true);
+            $statusCode = $statusData['status_code'] ?? '';
+
+            if ($statusCode === 'FINISHED') {
+                break;
+            }
+            if ($statusCode === 'ERROR') {
+                return ['success' => false, 'error' => 'Instagram media processing failed: ' . $statusResponse, 'image_url' => $imageUrl];
+            }
+            // IN_PROGRESS — keep polling
+        }
+
+        // Step 3: Publish
         $publishUrl = "https://graph.facebook.com/v20.0/" . urlencode($accountId) . "/media_publish";
         $publishData = [
             'creation_id' => $mediaObj['id'],
@@ -863,6 +903,48 @@ class SmpPoster
         }
 
         return ['success' => false, 'error' => 'Token refresh failed: ' . $response];
+    }
+
+    /**
+     * Refresh a LinkedIn OAuth2 access token using a refresh token.
+     */
+    private function refreshLinkedInAccessToken(string $clientId, string $clientSecret, string $refreshToken): array
+    {
+        $url = 'https://www.linkedin.com/oauth/v2/accessToken';
+
+        $postData = [
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+            'refresh_token' => $refreshToken,
+            'grant_type' => 'refresh_token',
+        ];
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, 1);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postData));
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        $response = curl_exec($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if ($error) {
+            return ['success' => false, 'error' => 'LinkedIn token refresh cURL error: ' . $error];
+        }
+
+        $data = json_decode($response, true);
+        if (!empty($data['access_token'])) {
+            return [
+                'success' => true,
+                'access_token' => $data['access_token'],
+                'expires_in' => $data['expires_in'] ?? 5184000,
+                'refresh_token' => $data['refresh_token'] ?? $refreshToken,
+                'refresh_token_expires_in' => $data['refresh_token_expires_in'] ?? null,
+            ];
+        }
+
+        return ['success' => false, 'error' => 'LinkedIn token refresh failed: ' . $response];
     }
 
     /**
@@ -1429,6 +1511,15 @@ class SmpPoster
                 return $this->probeMetaTokenExpiry($creds['access_token'] ?? '');
 
             case SmpConstants::PLATFORM_LINKEDIN:
+                // If OAuth credentials are available, try a refresh to validate
+                if (!empty($creds['client_id']) && !empty($creds['client_secret']) && !empty($creds['refresh_token'])) {
+                    $result = $this->refreshLinkedInAccessToken($creds['client_id'], $creds['client_secret'], $creds['refresh_token']);
+                    if ($result['success']) {
+                        $expiresIn = $result['expires_in'] ?? 5184000;
+                        return date('Y-m-d', time() + (int)$expiresIn);
+                    }
+                    return 'invalid';
+                }
                 return $this->probeLinkedInTokenExpiry($creds['access_token'] ?? '');
 
             case SmpConstants::PLATFORM_TELEGRAM:
@@ -1709,7 +1800,8 @@ class SmpPoster
     {
         $results = array_merge(
             $this->autoRefreshMetaTokens(),
-            $this->autoRefreshGoogleTokens()
+            $this->autoRefreshGoogleTokens(),
+            $this->autoRefreshLinkedInTokens()
         );
 
         qa_opt(SmpConstants::OPT_LAST_TOKEN_REFRESH, date('Y-m-d H:i:s'));
@@ -1887,6 +1979,106 @@ class SmpPoster
 
         if ($ytChanged) {
             $this->saveAccounts(SmpConstants::PLATFORM_YOUTUBE, $ytAccounts);
+        }
+
+        return $results;
+    }
+
+    /**
+     * Auto-refresh LinkedIn tokens when they are within 7 days of expiry.
+     *
+     * @return array Summary of refresh results per account
+     */
+    public function autoRefreshLinkedInTokens(): array
+    {
+        $results = [];
+        $liAccounts = $this->getAccounts(SmpConstants::PLATFORM_LINKEDIN);
+        $liChanged = false;
+
+        foreach ($liAccounts as $idx => &$liAccount) {
+            if (empty($liAccount['enabled'])) {
+                continue;
+            }
+
+            $creds = $liAccount['credentials'] ?? [];
+            $clientId = $creds['client_id'] ?? '';
+            $clientSecret = $creds['client_secret'] ?? '';
+            $refreshToken = $creds['refresh_token'] ?? '';
+            $accountName = $liAccount['name'] ?? ('LinkedIn Account ' . ($idx + 1));
+
+            if (empty($clientId) || empty($clientSecret) || empty($refreshToken)) {
+                $results['linkedin_' . $idx] = [
+                    'platform' => 'linkedin',
+                    'account' => $accountName,
+                    'status' => 'skipped',
+                    'reason' => 'Missing OAuth credentials (client_id, client_secret, or refresh_token)',
+                ];
+                continue;
+            }
+
+            $expiryDate = $liAccount['token_expiry_date'] ?? '';
+
+            // Only refresh if expiry is within 7 days or unknown
+            $shouldRefresh = empty($expiryDate);
+            if (!empty($expiryDate)) {
+                try {
+                    $expiry = new DateTime($expiryDate);
+                    $today = new DateTime('today');
+                    $diff = $today->diff($expiry);
+                    $daysLeft = $diff->invert ? -$diff->days : $diff->days;
+                    $shouldRefresh = ($daysLeft <= 7);
+                } catch (Exception $e) {
+                    $shouldRefresh = true;
+                }
+            }
+
+            if (!$shouldRefresh) {
+                $results['linkedin_' . $idx] = [
+                    'platform' => 'linkedin',
+                    'account' => $accountName,
+                    'status' => 'skipped',
+                    'reason' => 'Token not near expiry (expires: ' . $expiryDate . ')',
+                ];
+                continue;
+            }
+
+            $refreshResult = $this->refreshLinkedInAccessToken($clientId, $clientSecret, $refreshToken);
+
+            if ($refreshResult['success']) {
+                $liAccount['credentials']['access_token'] = $refreshResult['access_token'];
+                // Update refresh_token if LinkedIn issued a new one
+                if (!empty($refreshResult['refresh_token'])) {
+                    $liAccount['credentials']['refresh_token'] = $refreshResult['refresh_token'];
+                }
+                $expiresIn = $refreshResult['expires_in'] ?? 5184000;
+                $liAccount['token_expiry_date'] = date('Y-m-d', time() + (int)$expiresIn);
+                $liAccount['token_expiry_source'] = 'auto-refresh';
+                $liAccount['token_last_refreshed'] = date('Y-m-d H:i:s');
+                $liChanged = true;
+
+                $results['linkedin_' . $idx] = [
+                    'platform' => 'linkedin',
+                    'account' => $accountName,
+                    'status' => 'refreshed',
+                    'new_expiry' => $liAccount['token_expiry_date'],
+                ];
+            } else {
+                $liAccount['token_expiry_source'] = 'invalid';
+                $liAccount['token_last_refreshed'] = date('Y-m-d H:i:s');
+                $liChanged = true;
+
+                $results['linkedin_' . $idx] = [
+                    'platform' => 'linkedin',
+                    'account' => $accountName,
+                    'status' => 'failed',
+                    'error' => $refreshResult['error'],
+                ];
+            }
+        }
+        unset($liAccount);
+
+        if ($liChanged) {
+            $this->saveAccounts(SmpConstants::PLATFORM_LINKEDIN, $liAccounts);
         }
 
         return $results;

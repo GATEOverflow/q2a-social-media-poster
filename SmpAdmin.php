@@ -81,6 +81,14 @@ class SmpAdmin
             $message = 'Google token refresh: ' . $this->formatRefreshResults($refreshResults);
         }
 
+        // Handle manual LinkedIn token refresh
+        if (qa_clicked('smp_refresh_linkedin_tokens')) {
+            require_once $this->directory . 'SmpPoster.php';
+            $poster = new SmpPoster($this->directory);
+            $refreshResults = $poster->autoRefreshLinkedInTokens();
+            $message = 'LinkedIn token refresh: ' . $this->formatRefreshResults($refreshResults);
+        }
+
         // Show Google OAuth callback result
         $oauthStatus = qa_get('smp_oauth');
         if ($oauthStatus === 'oauth_success') {
@@ -1052,6 +1060,69 @@ class SmpAdmin
             'label' => $googleBtns,
         ];
 
+        // -- LinkedIn Token Refresh --
+        $fields['linkedin_token_header'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:16px 0 5px;color:#555;">🔵 LinkedIn</h3>',
+        ];
+
+        $liAccounts = $this->getAccounts(SmpConstants::PLATFORM_LINKEDIN);
+        $needsLinkedInOAuth = false;
+        foreach ($liAccounts as $li => $la) {
+            if (empty($la['enabled'])) continue;
+            $laName = $la['name'] ?? ('LinkedIn Account ' . ($li + 1));
+            $laExpiry = $la['token_expiry_date'] ?? '';
+            $laRefreshed = $la['token_last_refreshed'] ?? '';
+            $laSource = $la['token_expiry_source'] ?? '';
+            $laCreds = $la['credentials'] ?? [];
+            $hasRefreshToken = !empty($laCreds['refresh_token']);
+            $hasClientId = !empty($laCreds['client_id']);
+            $statusHtml = 'LinkedIn: <strong>' . htmlspecialchars($laName, ENT_QUOTES, 'UTF-8') . '</strong>';
+
+            if ($laSource === 'invalid') {
+                $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Invalid / Revoked</span>';
+                $needsLinkedInOAuth = true;
+            } elseif ($hasClientId && !$hasRefreshToken) {
+                $statusHtml .= ' — <span style="color:#e65100;font-weight:bold;">Not authenticated — click below to connect</span>';
+                $needsLinkedInOAuth = true;
+            } elseif (!empty($laExpiry)) {
+                try {
+                    $lExpObj = new DateTime($laExpiry);
+                    $lToday = new DateTime('today');
+                    if ($lExpObj < $lToday) {
+                        $statusHtml .= ' — <span style="color:#ea4335;font-weight:bold;">Expired: ' . htmlspecialchars($laExpiry, ENT_QUOTES, 'UTF-8') . '</span>';
+                        $needsLinkedInOAuth = true;
+                    } else {
+                        $statusHtml .= ' — Expires: ' . htmlspecialchars($laExpiry, ENT_QUOTES, 'UTF-8');
+                    }
+                } catch (Exception $e) {
+                    $statusHtml .= ' — <span style="color:#ea4335;">Invalid date</span>';
+                    $needsLinkedInOAuth = true;
+                }
+            } else {
+                $statusHtml .= ' — <em>Not yet checked</em>';
+            }
+            if (!empty($laRefreshed)) {
+                $statusHtml .= ' (last checked: ' . htmlspecialchars($laRefreshed, ENT_QUOTES, 'UTF-8') . ')';
+            }
+            $fields['linkedin_status_' . $li] = [
+                'type' => 'static',
+                'label' => '&nbsp;&nbsp;&nbsp;' . $statusHtml,
+            ];
+        }
+
+        $linkedinBtns = '<button type="submit" name="smp_refresh_linkedin_tokens" style="background:#0a66c2;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">🔄 Validate LinkedIn Tokens</button>';
+
+        // Show OAuth authenticate/renewal link if any LinkedIn account needs it
+        if ($needsLinkedInOAuth && $isSuperAdmin) {
+            $linkedinBtns .= $this->buildLinkedInOAuthRenewalHtml($liAccounts);
+        }
+
+        $fields['btn_refresh_linkedin'] = [
+            'type' => 'static',
+            'label' => $linkedinBtns,
+        ];
+
         // ========== Save All button at bottom ==========
         $fields['section_save_all'] = [
             'type' => 'static',
@@ -1152,6 +1223,57 @@ class SmpAdmin
         return $html;
     }
 
+    /**
+     * Build HTML for LinkedIn OAuth manual renewal flow.
+     */
+    private function buildLinkedInOAuthRenewalHtml(array $liAccounts): string
+    {
+        $html = '<div style="margin-top:12px;padding:12px;background:#e3f2fd;border:1px solid #bbdefb;border-radius:5px;">';
+        $html .= '<strong style="color:#0a66c2;">⚠ LinkedIn authentication required</strong><br>';
+        $html .= '<p style="margin:8px 0;font-size:13px;">One or more LinkedIn accounts need to be authenticated:</p>';
+
+        $redirectUri = qa_path_absolute('smp-oauth-callback');
+        $html .= '<div style="margin:8px 0;padding:8px;background:#e8f5e9;border:1px solid #c8e6c9;border-radius:4px;font-size:12px;">';
+        $html .= '<strong>Required Redirect URI for LinkedIn Developer Portal:</strong> ';
+        $html .= '<code style="background:#fff;padding:2px 6px;border:1px solid #ddd;border-radius:3px;user-select:all;">'
+            . htmlspecialchars($redirectUri, ENT_QUOTES, 'UTF-8') . '</code>';
+        $html .= '<br><span style="color:#666;">Add this exact URI as an <em>Authorized redirect URL</em> in your '
+            . '<a href="https://www.linkedin.com/developers/apps" target="_blank">LinkedIn Developer Portal</a> app\'s Auth settings.</span>';
+        $html .= '</div>';
+
+        foreach ($liAccounts as $li => $la) {
+            if (empty($la['enabled'])) continue;
+            $laCreds = $la['credentials'] ?? [];
+            $clientId = $laCreds['client_id'] ?? '';
+            if (empty($clientId)) continue;
+
+            $laName = $la['name'] ?? ('LinkedIn Account ' . ($li + 1));
+            $hasToken = !empty($laCreds['refresh_token']);
+            $btnLabel = $hasToken ? '🔑 Re-authenticate: ' : '🔑 Authenticate: ';
+
+            $authUrl = 'https://www.linkedin.com/oauth/v2/authorization?' . http_build_query([
+                'response_type' => 'code',
+                'client_id' => $clientId,
+                'redirect_uri' => $redirectUri,
+                'scope' => 'openid profile w_member_social',
+                'state' => 'smp_linkedin_oauth_' . $li,
+            ]);
+
+            $html .= '<div style="margin:6px 0;">';
+            $html .= '<a href="' . htmlspecialchars($authUrl, ENT_QUOTES, 'UTF-8') . '" '
+                . 'style="background:#0a66c2;color:#fff;padding:6px 14px;border-radius:3px;text-decoration:none;font-size:13px;">'
+                . $btnLabel . htmlspecialchars($laName, ENT_QUOTES, 'UTF-8') . '</a>';
+            $html .= '</div>';
+        }
+
+        $html .= '<div style="margin-top:10px;font-size:12px;color:#666;">';
+        $html .= 'Click the button above. After authenticating with LinkedIn, the tokens will be saved automatically and you will be redirected back here. '
+            . 'Your Author URN will also be auto-detected if not already set.';
+        $html .= '</div>';
+        $html .= '</div>';
+
+        return $html;
+    }
 
 
     private function getAccounts(string $platform): array
