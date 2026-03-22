@@ -86,7 +86,7 @@ class SmpImageGenerator
 
         // Run wkhtmltoimage
         $cmd = sprintf(
-            'wkhtmltoimage --enable-javascript --javascript-delay 1500 --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
+            'wkhtmltoimage --enable-javascript --javascript-delay 3000 --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
             $w, $h,
             escapeshellarg($tempHtml),
             escapeshellarg($tempPng)
@@ -131,19 +131,25 @@ body{width:' . $w . 'px;height:' . $h . 'px;background:linear-gradient(180deg,#0
 .circle1{position:absolute;top:-20px;right:-20px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05)}
 .circle2{position:absolute;bottom:-20px;left:-20px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.05)}
 .content{padding:50px 60px 100px;display:flex;flex-direction:column;height:100%}
-.badge{align-self:center;background:rgba(59,130,246,0.35);color:#fff;font-size:14px;font-weight:700;letter-spacing:2px;padding:8px 24px;border-radius:20px;margin-bottom:28px}
-.question-card{background:rgba(255,255,255,0.08);border-radius:16px;padding:28px 32px;border-left:4px solid #3B82F6;margin-bottom:24px}
-.question-card p,.question-card{font-size:22px;line-height:1.5;color:#e8eaed}
-.options{display:flex;flex-direction:column;gap:12px;flex:1}
-.option{background:rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px}
-.option-label{width:38px;height:38px;min-width:38px;border-radius:50%;background:#3B82F6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff}
-.option-text{font-size:18px;line-height:1.4;color:#dadce0}
+.badge{align-self:center;background:rgba(59,130,246,0.35);color:#fff;font-size:18px;font-weight:700;letter-spacing:2.5px;padding:10px 28px;border-radius:20px;margin-bottom:28px}
+.question-card{background:rgba(255,255,255,0.08);border-radius:16px;padding:32px 36px;border-left:5px solid #3B82F6;margin-bottom:24px}
+.question-card p,.question-card{font-size:28px;line-height:1.55;color:#e8eaed}
+.question-card ol,.question-card ul{margin:12px 0 12px 28px;font-size:26px;line-height:1.5;color:#dadce0}
+.question-card ol li,.question-card ul li{margin-bottom:6px}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:rgba(255,255,255,0.06);border-radius:8px;padding:2px 8px;font-size:24px;color:#93c5fd}
+.question-card pre{display:block;padding:14px 18px;margin:12px 0;overflow-x:auto;white-space:pre-wrap}
+.question-card table{border-collapse:collapse;margin:12px 0;font-size:24px}
+.question-card td,.question-card th{border:1px solid rgba(255,255,255,0.15);padding:8px 14px}
+.question-card img{max-width:100%;border-radius:8px}
+.options{display:flex;flex-direction:column;gap:14px;flex:1}
+.option{background:rgba(255,255,255,0.06);border-radius:14px;padding:18px 24px;display:flex;align-items:center;gap:20px}
+.option-label{width:44px;height:44px;min-width:44px;border-radius:50%;background:#3B82F6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;color:#fff}
+.option-text{font-size:24px;line-height:1.45;color:#dadce0}
 .branding{position:absolute;bottom:30px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:15px}
-.branding .site{font-size:18px;font-weight:700;color:rgba(255,255,255,0.7)}
-.branding .url{font-size:13px;color:rgba(255,255,255,0.4)}
-.katex{font-size:1em!important}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.7)}
+.branding .url{font-size:15px;color:rgba(255,255,255,0.4)}
+.katex{font-size:1.1em!important}
 .katex-display{margin:0.3em 0!important}
-ol,ul{display:none}
 </style></head><body>
 <div class="accent-bar"></div>
 <div class="circle1"></div>
@@ -176,22 +182,32 @@ renderMathInElement(document.body,{delimiters:[
     {
         $options = [];
 
-        $questionHtml = preg_replace_callback('/<ol\b[^>]*>(.*?)<\/ol>/is', function ($olMatch) use (&$options) {
-            $olTag = $olMatch[0];
+        // Find ALL <ol>...</ol> blocks
+        if (preg_match_all('/<ol\b[^>]*>.*?<\/ol>/is', $html, $allOlMatches, PREG_OFFSET_CAPTURE)) {
+            // Only the LAST <ol> is treated as answer options
+            $lastOl = end($allOlMatches[0]);
+            $lastOlHtml = $lastOl[0];
+            $lastOlOffset = $lastOl[1];
+
             $style = 'upper-alpha';
-            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $lastOlHtml, $sm)) {
                 $style = strtolower(trim($sm[1], "; \t"));
             }
 
-            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olMatch[1], $liMatches);
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $lastOlHtml, $liMatches);
             if (!empty($liMatches[1])) {
                 foreach ($liMatches[1] as $i => $liContent) {
                     $label = $this->getOptionLabel($style, $i);
                     $options[] = ['label' => $label, 'html' => trim($liContent)];
                 }
             }
-            return '';
-        }, $html);
+
+            // Remove only the last <ol> from the body; keep all others
+            $questionHtml = substr($html, 0, $lastOlOffset)
+                . substr($html, $lastOlOffset + strlen($lastOlHtml));
+        } else {
+            $questionHtml = $html;
+        }
 
         $questionHtml = trim($questionHtml);
     }
