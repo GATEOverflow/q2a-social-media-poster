@@ -6,6 +6,9 @@
  */
 class SmpImageGenerator
 {
+    // Regex pattern to match a balanced {…} group (up to 3 levels of nesting)
+    private const BRACE_PATTERN = '\\{(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*\\}';
+
     private int $width;
     private int $height;
     private array $bgColor;
@@ -44,12 +47,159 @@ class SmpImageGenerator
     /**
      * Generate an image from question text and return its public URL.
      *
-     * @param string $text The question text (HTML stripped)
+     * @param string $text The question text (may contain HTML and MathJax/LaTeX)
      * @param string $title Optional title to display prominently
      * @param int|null $postId Optional post ID for unique filename
      * @return string|null Public URL of the generated image, or null on failure
      */
     public function generateFromText(string $text, string $title = '', ?int $postId = null): ?string
+    {
+        // Extract options and question body as HTML (preserving MathJax)
+        $questionHtml = '';
+        $optionsHtml = [];
+        $this->parseQuestionHtmlRaw($text, $questionHtml, $optionsHtml);
+
+        $titleClean = htmlspecialchars(html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+
+        $w = $this->width;
+        $h = $this->height;
+
+        $siteName = htmlspecialchars(qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
+        $siteUrl = htmlspecialchars(rtrim(qa_opt('site_url') ?: '', '/'), ENT_QUOTES, 'UTF-8');
+        $siteHost = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
+
+        // Build options HTML
+        $optionsDivs = '';
+        foreach ($optionsHtml as $opt) {
+            $label = htmlspecialchars($opt['label'], ENT_QUOTES, 'UTF-8');
+            $optionsDivs .= '<div class="option"><div class="option-label">' . $label
+                . '</div><div class="option-text">' . $opt['html'] . '</div></div>' . "\n";
+        }
+
+        // Build the full HTML page
+        $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h);
+
+        // Write to temp file
+        $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
+        $tempPng = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.png';
+        file_put_contents($tempHtml, $html);
+
+        // Run wkhtmltoimage
+        $cmd = sprintf(
+            'wkhtmltoimage --enable-javascript --javascript-delay 1500 --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
+            $w, $h,
+            escapeshellarg($tempHtml),
+            escapeshellarg($tempPng)
+        );
+
+        exec($cmd, $output, $exitCode);
+
+        // Clean up temp HTML
+        @unlink($tempHtml);
+
+        if ($exitCode !== 0 || !file_exists($tempPng)) {
+            @unlink($tempPng);
+            // Fall back to simple GD rendering
+            return $this->generateFromTextGd($text, $title, $postId);
+        }
+
+        // Load with GD and re-save compressed
+        $img = imagecreatefrompng($tempPng);
+        @unlink($tempPng);
+
+        if (!$img) {
+            return $this->generateFromTextGd($text, $title, $postId);
+        }
+
+        return $this->saveImage($img, 'smp_qotd_' . ($postId ?: uniqid()) . '_' . time());
+    }
+
+    /**
+     * Build the HTML page for QOTD image rendering.
+     */
+    private function buildQotdHtml(string $questionHtml, string $optionsDivs, string $siteName, string $siteHost, int $w, int $h): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:' . $w . 'px;height:' . $h . 'px;background:linear-gradient(180deg,#0f172a 0%,#1e3a5f 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#e8eaed;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:6px;background:#3B82F6}
+.circle1{position:absolute;top:-20px;right:-20px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.05)}
+.circle2{position:absolute;bottom:-20px;left:-20px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,0.05)}
+.content{padding:50px 60px 100px;display:flex;flex-direction:column;height:100%}
+.badge{align-self:center;background:rgba(59,130,246,0.35);color:#fff;font-size:14px;font-weight:700;letter-spacing:2px;padding:8px 24px;border-radius:20px;margin-bottom:28px}
+.question-card{background:rgba(255,255,255,0.08);border-radius:16px;padding:28px 32px;border-left:4px solid #3B82F6;margin-bottom:24px}
+.question-card p,.question-card{font-size:22px;line-height:1.5;color:#e8eaed}
+.options{display:flex;flex-direction:column;gap:12px;flex:1}
+.option{background:rgba(255,255,255,0.06);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:16px}
+.option-label{width:38px;height:38px;min-width:38px;border-radius:50%;background:#3B82F6;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:#fff}
+.option-text{font-size:18px;line-height:1.4;color:#dadce0}
+.branding{position:absolute;bottom:30px;left:60px;right:60px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:15px}
+.branding .site{font-size:18px;font-weight:700;color:rgba(255,255,255,0.7)}
+.branding .url{font-size:13px;color:rgba(255,255,255,0.4)}
+.katex{font-size:1em!important}
+.katex-display{margin:0.3em 0!important}
+ol,ul{display:none}
+</style></head><body>
+<div class="accent-bar"></div>
+<div class="circle1"></div>
+<div class="circle2"></div>
+<div class="content">
+<div class="badge">QUESTION OF THE DAY</div>
+<div class="question-card">' . $questionHtml . '</div>
+<div class="options">' . $optionsDivs . '</div>
+</div>
+<div class="branding">
+<span class="site">' . $siteName . '</span>
+<span class="url">' . $siteHost . '</span>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+renderMathInElement(document.body,{delimiters:[
+{left:"$$",right:"$$",display:true},
+{left:"$",right:"$",display:false},
+{left:"\\\\(",right:"\\\\)",display:false},
+{left:"\\\\[",right:"\\\\]",display:true}
+],throwOnError:false});});
+</script></body></html>';
+    }
+
+    /**
+     * Parse question HTML keeping raw HTML (for wkhtmltoimage rendering).
+     * Extracts options from <ol><li> as structured data with HTML preserved.
+     */
+    private function parseQuestionHtmlRaw(string $html, string &$questionHtml, array &$options): void
+    {
+        $options = [];
+
+        $questionHtml = preg_replace_callback('/<ol\b[^>]*>(.*?)<\/ol>/is', function ($olMatch) use (&$options) {
+            $olTag = $olMatch[0];
+            $style = 'upper-alpha';
+            if (preg_match('/list-style-type:\s*([a-z-]+)/i', $olTag, $sm)) {
+                $style = strtolower(trim($sm[1], "; \t"));
+            }
+
+            preg_match_all('/<li\b[^>]*>(.*?)<\/li>/is', $olMatch[1], $liMatches);
+            if (!empty($liMatches[1])) {
+                foreach ($liMatches[1] as $i => $liContent) {
+                    $label = $this->getOptionLabel($style, $i);
+                    $options[] = ['label' => $label, 'html' => trim($liContent)];
+                }
+            }
+            return '';
+        }, $html);
+
+        $questionHtml = trim($questionHtml);
+    }
+
+    /**
+     * Fallback: generate QOTD image using GD when wkhtmltoimage is unavailable.
+     */
+    private function generateFromTextGd(string $text, string $title = '', ?int $postId = null): ?string
     {
         if (!extension_loaded('gd')) {
             return null;
@@ -67,14 +217,11 @@ class SmpImageGenerator
         $h = $this->height;
 
         $img = imagecreatetruecolor($w, $h);
-        if (!$img) {
-            return null;
-        }
+        if (!$img) return null;
         imagesavealpha($img, true);
 
-        // --- Material Design: clean dark surface gradient ---
-        $topR = 18; $topG = 18; $topB = 18;    // #121212 (MD dark surface)
-        $botR = 30; $botG = 30; $botB = 42;    // slight blue tint at bottom
+        $topR = 15; $topG = 23; $topB = 42;
+        $botR = 30; $botG = 58; $botB = 95;
         for ($y = 0; $y < $h; $y++) {
             $ratio = $y / max($h - 1, 1);
             $r = (int)($topR + ($botR - $topR) * $ratio);
@@ -84,147 +231,94 @@ class SmpImageGenerator
             imageline($img, 0, $y, $w - 1, $y, $lineCol);
         }
 
-        // Accent bar at top (Material primary color)
-        $primaryCol = imagecolorallocate($img, 66, 133, 244); // Google Blue #4285F4
-        imagefilledrectangle($img, 0, 0, $w - 1, 4, $primaryCol);
+        $circleCol = imagecolorallocatealpha($img, 255, 255, 255, 118);
+        imagefilledellipse($img, (int)($w * 0.90), (int)($h * 0.08), 200, 200, $circleCol);
+        imagefilledellipse($img, (int)($w * 0.08), (int)($h * 0.92), 150, 150, $circleCol);
+
+        $primaryCol = imagecolorallocate($img, 59, 130, 246);
+        imagefilledrectangle($img, 0, 0, $w - 1, 6, $primaryCol);
 
         $padding = 60;
         $innerW = $w - 2 * $padding;
         $yOffset = 40;
 
-        // --- Fonts ---
         $fontRegular = $this->fontPath;
         $fontBold = str_replace('DejaVuSans.ttf', 'DejaVuSans-Bold.ttf', $this->fontPath);
         if (!file_exists($fontBold)) $fontBold = $fontRegular;
-
         $white = imagecolorallocate($img, 255, 255, 255);
 
-        // --- "QUESTION OF THE DAY" header ---
-        $headerSize = 13;
-        $headerText = 'QUESTION OF THE DAY';
-        $headerBox = imagettfbbox($headerSize, 0, $fontBold, $headerText);
-        $headerW = abs($headerBox[2] - $headerBox[0]);
-        $headerX = (int)(($w - $headerW) / 2);
-        $headerCol = imagecolorallocate($img, 138, 180, 248); // MD Blue 200 #8AB4F8
-        imagettftext($img, $headerSize, 0, $headerX, $yOffset + $headerSize, $headerCol, $fontBold, $headerText);
-        $yOffset += $headerSize + 12;
+        // Badge
+        $badgeText = 'QUESTION OF THE DAY';
+        $badgeSize = 14;
+        $badgeBox = imagettfbbox($badgeSize, 0, $fontBold, $badgeText);
+        $badgeW = abs($badgeBox[2] - $badgeBox[0]);
+        $badgeH = abs($badgeBox[7] - $badgeBox[1]);
+        $badgePadX = 20; $badgePadY = 8;
+        $badgeX = (int)(($w - $badgeW - 2 * $badgePadX) / 2);
+        $pillBg = imagecolorallocatealpha($img, 59, 130, 246, 60);
+        $this->drawRoundedRect($img, $badgeX, (int)$yOffset, $badgeX + $badgeW + 2 * $badgePadX, (int)($yOffset + $badgeH + 2 * $badgePadY), 14, $pillBg);
+        imagettftext($img, $badgeSize, 0, $badgeX + $badgePadX, (int)($yOffset + $badgePadY + $badgeSize), $white, $fontBold, $badgeText);
+        $yOffset += $badgeH + 2 * $badgePadY + 25;
 
-        // Subtle divider line under header
-        $dividerCol = imagecolorallocatealpha($img, 255, 255, 255, 108); // ~15% white
-        imageline($img, $padding + 60, (int)$yOffset, $w - $padding - 60, (int)$yOffset, $dividerCol);
-        $yOffset += 24;
-
-        // --- Question card (elevated surface) ---
-        $cardBg = imagecolorallocate($img, 30, 30, 30); // MD surface #1E1E1E
-        $cardRadius = 16;
+        // Question card
+        $cardBg = imagecolorallocatealpha($img, 255, 255, 255, 108);
         $cardPadding = 28;
-
-        // Estimate question height to draw card background
         $qFontSize = 22;
         $qLen = mb_strlen($questionBody);
         if ($qLen > 300) $qFontSize = 18;
         elseif ($qLen > 200) $qFontSize = 20;
-
         $qInnerW = $innerW - 2 * $cardPadding;
         $wrappedQ = $this->wrapText($questionBody, $qFontSize, $qInnerW);
         $qLineH = $qFontSize + 10;
-
         $maxQLines = empty($options) ? 18 : (count($options) <= 4 ? 7 : 5);
         if (count($wrappedQ) > $maxQLines) {
             $wrappedQ = array_slice($wrappedQ, 0, $maxQLines);
             $wrappedQ[$maxQLines - 1] .= '...';
         }
-
         $qCardH = count($wrappedQ) * $qLineH + 2 * $cardPadding;
-        $qCardTop = (int)$yOffset;
-        $qCardBot = (int)($yOffset + $qCardH);
-
-        // Draw question card with rounded corners
-        $this->drawRoundedRect($img, $padding, $qCardTop, $padding + $innerW, $qCardBot, $cardRadius, $cardBg);
-
-        // Left accent bar on question card
+        $this->drawRoundedRect($img, $padding, (int)$yOffset, $padding + $innerW, (int)($yOffset + $qCardH), 16, $cardBg);
         $accentBar = imagecolorallocate($img, 66, 133, 244);
-        $this->drawRoundedRect($img, $padding, $qCardTop, $padding + 4, $qCardBot, 2, $accentBar);
-
-        // Render question text
-        $qTextCol = imagecolorallocate($img, 232, 234, 237); // MD high-emphasis #E8EAED
-        $qTxtY = $qCardTop + $cardPadding;
+        $this->drawRoundedRect($img, $padding, (int)$yOffset, $padding + 4, (int)($yOffset + $qCardH), 2, $accentBar);
+        $qTextCol = imagecolorallocate($img, 232, 234, 237);
+        $qTxtY = $yOffset + $cardPadding;
         foreach ($wrappedQ as $line) {
             imagettftext($img, $qFontSize, 0, $padding + $cardPadding + 8, (int)($qTxtY + $qFontSize), $qTextCol, $fontRegular, $line);
             $qTxtY += $qLineH;
         }
-        $yOffset = $qCardBot + 20;
+        $yOffset += $qCardH + 20;
 
-        // --- Options (Material card-style rows) ---
+        // Options
         if (!empty($options)) {
-            $optFontSize = 18;
-            $optLineH = $optFontSize + 8;
-            $optPadY = 16;
-            $circleD = 38; // circle diameter for label badge
-            $circleR = $circleD / 2;
-            $optGap = 12;
-            $optTextXOffset = $circleD + 24; // space after circle badge
-            $labelSize = 15;
-
-            // Shrink font for long options
+            $optFontSize = 18; $optLineH = $optFontSize + 8; $optPadY = 16;
+            $circleD = 38; $optGap = 12; $optTextXOffset = $circleD + 24; $labelSize = 15;
             $maxOptLen = 0;
-            foreach ($options as $opt) {
-                $maxOptLen = max($maxOptLen, mb_strlen($opt['text']));
-            }
-            if ($maxOptLen > 80 || count($options) > 4) {
-                $optFontSize = 16;
-                $optLineH = $optFontSize + 8;
-            }
-
+            foreach ($options as $opt) $maxOptLen = max($maxOptLen, mb_strlen($opt['text']));
+            if ($maxOptLen > 80 || count($options) > 4) { $optFontSize = 16; $optLineH = $optFontSize + 8; }
             $optInnerW = $innerW - $optTextXOffset - 24;
-            $optSurfaceBg = imagecolorallocate($img, 40, 40, 43); // MD surface variant
-            $optTextCol = imagecolorallocate($img, 218, 220, 224); // MD medium-emphasis
-            $circleBg = imagecolorallocate($img, 66, 133, 244); // Google Blue
-
+            $optSurfaceBg = imagecolorallocatealpha($img, 255, 255, 255, 112);
+            $optTextCol = imagecolorallocate($img, 220, 230, 245);
+            $circleBg = imagecolorallocate($img, 59, 130, 246);
             foreach ($options as $opt) {
-                $label = $opt['label'];
-                $optText = $opt['text'];
-                $wrappedOpt = $this->wrapText($optText, $optFontSize, $optInnerW);
+                $wrappedOpt = $this->wrapText($opt['text'], $optFontSize, $optInnerW);
                 $boxH = max($circleD + 8, count($wrappedOpt) * $optLineH + 2 * $optPadY);
-
-                if ($yOffset + $boxH + $optGap > $h - 80) {
-                    break;
-                }
-
-                $optTop = (int)$yOffset;
-                $optBot = (int)($yOffset + $boxH);
-
-                // Option card background
-                $this->drawRoundedRect($img, $padding, $optTop, $padding + $innerW, $optBot, 12, $optSurfaceBg);
-
-                // Circle label badge (centered vertically)
-                $circleCX = $padding + 16 + (int)$circleR;
-                $circleCY = (int)($optTop + $boxH / 2);
+                if ($yOffset + $boxH + $optGap > $h - 80) break;
+                $this->drawRoundedRect($img, $padding, (int)$yOffset, $padding + $innerW, (int)($yOffset + $boxH), 12, $optSurfaceBg);
+                $circleCX = $padding + 16 + (int)($circleD / 2);
+                $circleCY = (int)($yOffset + $boxH / 2);
                 imagefilledellipse($img, $circleCX, $circleCY, $circleD, $circleD, $circleBg);
-
-                // Center label letter in circle
-                $lblBox = imagettfbbox($labelSize, 0, $fontBold, $label);
-                $lblTxtW = abs($lblBox[2] - $lblBox[0]);
-                $lblTxtH = abs($lblBox[7] - $lblBox[1]);
-                $lblTxtX = $circleCX - (int)($lblTxtW / 2);
-                $lblTxtY = $circleCY + (int)($lblTxtH / 2);
-                imagettftext($img, $labelSize, 0, $lblTxtX, $lblTxtY, $white, $fontBold, $label);
-
-                // Option text
-                $optTxtX = $padding + $optTextXOffset;
-                $optTxtY = $optTop + $optPadY;
+                $lblBox = imagettfbbox($labelSize, 0, $fontBold, $opt['label']);
+                $lblTxtW = abs($lblBox[2] - $lblBox[0]); $lblTxtH = abs($lblBox[7] - $lblBox[1]);
+                imagettftext($img, $labelSize, 0, $circleCX - (int)($lblTxtW / 2), $circleCY + (int)($lblTxtH / 2), $white, $fontBold, $opt['label']);
+                $optTxtX = $padding + $optTextXOffset; $optTxtY = $yOffset + $optPadY;
                 foreach ($wrappedOpt as $optLine) {
                     imagettftext($img, $optFontSize, 0, $optTxtX, (int)($optTxtY + $optFontSize), $optTextCol, $fontRegular, $optLine);
                     $optTxtY += $optLineH;
                 }
-
                 $yOffset += $boxH + $optGap;
             }
         }
 
-        // --- Bottom branding ---
         $this->drawBranding($img, $w, $h, $padding, $fontBold, $white);
-
         return $this->saveImage($img, 'smp_qotd_' . ($postId ?: uniqid()) . '_' . time());
     }
 
@@ -386,6 +480,11 @@ class SmpImageGenerator
      */
     private function convertMathJaxToUnicode(string $text): string
     {
+        // Process display math $$...$$ first
+        $text = preg_replace_callback('/\$\$(.+?)\$\$/s', function ($m) {
+            return $this->latexToUnicode($m[1]);
+        }, $text);
+
         // Process inline math: $...$ (but not $$...$$)
         $text = preg_replace_callback('/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/s', function ($m) {
             return $this->latexToUnicode($m[1]);
@@ -406,16 +505,43 @@ class SmpImageGenerator
     {
         $s = trim($latex);
 
-        // Fractions: \frac{a}{b} → a/b
-        $s = preg_replace_callback('/\\\\frac\s*\{([^{}]+)\}\s*\{([^{}]+)\}/', function ($m) {
-            $num = $this->latexToUnicode($m[1]);
-            $den = $this->latexToUnicode($m[2]);
+        // Handle \begin{...}...\end{...} environments
+        $s = preg_replace_callback('/\\\\begin\{([^{}]+)\}(.*?)\\\\end\{\1\}/s', function ($m) {
+            $env = $m[1];
+            $body = $m[2];
+            if (in_array($env, ['pmatrix', 'bmatrix', 'vmatrix', 'matrix', 'Bmatrix', 'Vmatrix'])) {
+                $rows = preg_split('/\\\\\\\\/', $body);
+                $rowTexts = [];
+                foreach ($rows as $row) {
+                    $cells = array_map('trim', explode('&', trim($row)));
+                    $rowTexts[] = implode(' ', array_map(function($c) { return $this->latexToUnicode($c); }, $cells));
+                }
+                $bracket = ($env === 'pmatrix') ? ['(', ')'] : (($env === 'bmatrix') ? ['[', ']'] : ['|', '|']);
+                return $bracket[0] . implode('; ', $rowTexts) . $bracket[1];
+            }
+            if ($env === 'cases') {
+                $rows = preg_split('/\\\\\\\\/', $body);
+                $parts = [];
+                foreach ($rows as $row) {
+                    $cells = array_map('trim', explode('&', trim($row)));
+                    $parts[] = implode(' ', array_map(function($c) { return $this->latexToUnicode($c); }, $cells));
+                }
+                return '{ ' . implode(', ' , $parts) . ' }';
+            }
+            return $this->latexToUnicode($body);
+        }, $s);
+
+        // Fractions: \frac{...}{...} — supports nested braces
+        $braceRe = self::BRACE_PATTERN;
+        $s = preg_replace_callback('/\\\\frac\s*(' . $braceRe . ')\s*(' . $braceRe . ')/', function ($m) {
+            $num = $this->latexToUnicode(substr($m[1], 1, -1));
+            $den = $this->latexToUnicode(substr($m[2], 1, -1));
             return '(' . $num . '/' . $den . ')';
         }, $s);
 
-        // Binomial: \binom{n}{k} → C(n,k)
-        $s = preg_replace_callback('/\\\\binom\s*\{([^{}]+)\}\s*\{([^{}]+)\}/', function ($m) {
-            return 'C(' . $this->latexToUnicode($m[1]) . ',' . $this->latexToUnicode($m[2]) . ')';
+        // Binomial: \binom{...}{...} — supports nested braces
+        $s = preg_replace_callback('/\\\\binom\s*(' . $braceRe . ')\s*(' . $braceRe . ')/', function ($m) {
+            return 'C(' . $this->latexToUnicode(substr($m[1], 1, -1)) . ',' . $this->latexToUnicode(substr($m[2], 1, -1)) . ')';
         }, $s);
 
         // Superscript: x^{n} or x^n → xⁿ (common cases)
@@ -483,29 +609,35 @@ class SmpImageGenerator
         ];
         $s = str_replace(array_keys($greek), array_values($greek), $s);
 
-        // Common math symbols
+        // Common math symbols (longer commands must come first to avoid prefix conflicts)
         $symbols = [
-            '\\times'=>'×', '\\div'=>'÷', '\\pm'=>'±', '\\mp'=>'∓',
-            '\\leq'=>'≤', '\\geq'=>'≥', '\\neq'=>'≠', '\\approx'=>'≈',
-            '\\equiv'=>'≡', '\\sim'=>'∼', '\\propto'=>'∝',
-            '\\infty'=>'∞', '\\partial'=>'∂', '\\nabla'=>'∇',
-            '\\forall'=>'∀', '\\exists'=>'∃', '\\neg'=>'¬',
-            '\\in'=>'∈', '\\notin'=>'∉', '\\subset'=>'⊂', '\\supset'=>'⊃',
-            '\\subseteq'=>'⊆', '\\supseteq'=>'⊇',
-            '\\cup'=>'∪', '\\cap'=>'∩', '\\emptyset'=>'∅',
-            '\\rightarrow'=>'→', '\\leftarrow'=>'←', '\\Rightarrow'=>'⇒', '\\Leftarrow'=>'⇐',
             '\\leftrightarrow'=>'↔', '\\Leftrightarrow'=>'⇔',
+            '\\rightarrow'=>'→', '\\leftarrow'=>'←', '\\Rightarrow'=>'⇒', '\\Leftarrow'=>'⇐',
+            '\\subseteq'=>'⊆', '\\supseteq'=>'⊇',
+            '\\emptyset'=>'∅',
+            '\\infty'=>'∞', '\\partial'=>'∂', '\\nabla'=>'∇',
+            '\\forall'=>'∀', '\\exists'=>'∃',
+            '\\notin'=>'∉', '\\subset'=>'⊂', '\\supset'=>'⊃',
+            '\\approx'=>'≈', '\\equiv'=>'≡', '\\propto'=>'∝',
+            '\\times'=>'×', '\\div'=>'÷',
+            '\\leq'=>'≤', '\\geq'=>'≥', '\\neq'=>'≠',
+            '\\sim'=>'∼', '\\neg'=>'¬', '\\mid'=>'|',
+            '\\int'=>'∫', '\\sum'=>'Σ', '\\prod'=>'Π',
+            '\\cup'=>'∪', '\\cap'=>'∩',
             '\\cdot'=>'·', '\\ldots'=>'…', '\\cdots'=>'⋯', '\\vdots'=>'⋮',
-            '\\sum'=>'Σ', '\\prod'=>'Π', '\\int'=>'∫',
             '\\lfloor'=>'⌊', '\\rfloor'=>'⌋', '\\lceil'=>'⌈', '\\rceil'=>'⌉',
             '\\land'=>'∧', '\\lor'=>'∨', '\\oplus'=>'⊕', '\\otimes'=>'⊗',
+            '\\in'=>'∈',
+            '\\pm'=>'±', '\\mp'=>'∓',
             '\\le'=>'≤', '\\ge'=>'≥', '\\ne'=>'≠',
             '\\to'=>'→', '\\gets'=>'←',
         ];
         $s = str_replace(array_keys($symbols), array_values($symbols), $s);
 
-        // \text{...} and \textbf{...} and \mathrm{...} — just extract content
-        $s = preg_replace('/\\\\(?:text|textbf|textrm|mathrm|mathbf|mathit|operatorname)\{([^{}]+)\}/', '$1', $s);
+        // \text{...} and \textbf{...} and \mathrm{...} — just extract content (nested braces)
+        $s = preg_replace_callback('/\\\\(?:text|textbf|textrm|mathrm|mathbf|mathit|operatorname)(' . self::BRACE_PATTERN . ')/', function ($m) {
+            return substr($m[1], 1, -1);
+        }, $s);
 
         // \left and \right — remove
         $s = str_replace(['\\left', '\\right'], '', $s);

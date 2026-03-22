@@ -1737,10 +1737,10 @@ class SmpAdmin
         }
 
         $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
-        return '<div style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
+        return '<div id="smp-preview-panel" style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
             . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
             . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📷 Quote Image Preview</span>'
-            . '<button onclick="this.closest(\'div[style]\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
+            . '<button onclick="document.getElementById(\'smp-preview-panel\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
             . '</div>'
             . '<a href="' . $safeUrl . '" target="_blank">'
             . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
@@ -1770,10 +1770,10 @@ class SmpAdmin
         }
 
         $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
-        return '<div style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
+        return '<div id="smp-preview-panel" style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
             . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
             . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📝 QOTD Preview — Post #' . $postId . '</span>'
-            . '<button onclick="this.closest(\'div[style]\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
+            . '<button onclick="document.getElementById(\'smp-preview-panel\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
             . '</div>'
             . '<a href="' . $safeUrl . '" target="_blank">'
             . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
