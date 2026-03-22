@@ -90,7 +90,31 @@ If you have many categories and want certain categories to post to specific chan
 - **Question of the Day**: Posts a random MCQ question from your database daily
 - **Quote of the Day**: Posts an AI-generated motivational quote daily
 
-Configure the hour when each should post (server time).
+Configure the hour when each should post (server time). The admin panel shows both the server time and your browser's local time for easy reference.
+
+#### Cron Job Setup (Recommended)
+
+By default, daily posts are triggered on the first page load after the configured hour. For exact-time posting, set up a cron job:
+
+1. Go to Admin → Plugins → Social Media Poster → Daily Poster Settings
+2. Set a **Cron Secret Key** (any random string, e.g. `my-secret-key-123`)
+3. Save settings — the full cron URL will be displayed
+4. Add a cron entry that runs every hour:
+
+**Using curl (HTTP):**
+```bash
+# Run every hour at minute 0
+0 * * * * curl -s "https://yoursite.com/qa-plugin/social-media-poster/cron.php?key=YOUR_SECRET_KEY" > /dev/null 2>&1
+```
+
+**Using PHP CLI (no web server needed):**
+```bash
+0 * * * * php /path/to/qa-plugin/social-media-poster/cron.php --key=YOUR_SECRET_KEY > /dev/null 2>&1
+```
+
+The script runs every hour but only posts when the configured hour is reached and the post hasn't been made today. This ensures posts happen within the first minute of the configured hour.
+
+**Without cron**, the plugin falls back to page-load triggering — posts happen on the first visitor page load after the configured hour.
 
 ## Custom Tables
 

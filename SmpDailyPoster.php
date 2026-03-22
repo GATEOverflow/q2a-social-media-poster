@@ -2,8 +2,7 @@
 
 /**
  * Daily poster module for Question of the Day and Quote of the Day.
- * Runs on each page load, throttled to once per day per feature.
- * Posts to platforms configured under the QOTD / Quote content types.
+ * Can be triggered via page load (init_queries) or via cron.php.
  */
 class SmpDailyPoster
 {
@@ -17,6 +16,24 @@ class SmpDailyPoster
     function init_queries($tableslc)
     {
         require_once $this->directory . 'SmpConstants.php';
+        $this->runDailyPosts();
+        return [];
+    }
+
+    /**
+     * Run daily posts if they are due.
+     * Called from init_queries (page load) or from cron.php.
+     */
+    public function runDailyPosts(): void
+    {
+        require_once $this->directory . 'SmpConstants.php';
+
+        // Use system timezone (PHP may default to UTC even if system is IST)
+        $sysTz = @trim(shell_exec('cat /etc/timezone 2>/dev/null'))
+            ?: @trim(shell_exec("timedatectl 2>/dev/null | grep 'Time zone' | awk '{print $3}'"));
+        if ($sysTz && in_array($sysTz, timezone_identifiers_list())) {
+            date_default_timezone_set($sysTz);
+        }
 
         $currentHour = (int)date('G');
         $today = date('Y-m-d');
@@ -25,12 +42,12 @@ class SmpDailyPoster
         if (qa_opt(SmpConstants::OPT_QOTD_ENABLED)) {
             $qotdHour = (int)(qa_opt(SmpConstants::OPT_QOTD_HOUR) ?: 9);
             $qotdLastRun = qa_opt(SmpConstants::OPT_QOTD_LAST_RUN);
-            $qotdLastDate = substr($qotdLastRun, 0, 10); // extract date part from datetime
+            $qotdLastDate = substr($qotdLastRun, 0, 10);
 
             if ($currentHour >= $qotdHour && $qotdLastDate !== $today) {
                 qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, $today); // lock immediately to prevent double-run
                 $this->postQuestionOfTheDay();
-                qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, date('Y-m-d H:i:s')); // update with actual post time
+                qa_opt(SmpConstants::OPT_QOTD_LAST_RUN, date('Y-m-d H:i:s'));
             }
         }
 
@@ -46,8 +63,6 @@ class SmpDailyPoster
                 qa_opt(SmpConstants::OPT_QUOTE_LAST_RUN, date('Y-m-d H:i:s'));
             }
         }
-
-        return [];
     }
 
     /**

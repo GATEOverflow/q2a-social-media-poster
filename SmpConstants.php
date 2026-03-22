@@ -49,6 +49,7 @@ class SmpConstants
     const OPT_QUOTE_HOUR = 'smp_quote_hour';
     const OPT_QUOTE_LAST_RUN = 'smp_quote_last_run';
     const OPT_QUOTE_PROMPT = 'smp_quote_prompt';
+    const OPT_CRON_KEY = 'smp_cron_key';
 
     // Manual share settings
     const OPT_MANUAL_SHARE_LEVEL = 'smp_manual_share_level';

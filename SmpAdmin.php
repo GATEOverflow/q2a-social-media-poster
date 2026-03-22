@@ -34,6 +34,7 @@ class SmpAdmin
             SmpConstants::OPT_QUOTE_ENABLED => '0',
             SmpConstants::OPT_QUOTE_HOUR => '8',
             SmpConstants::OPT_QUOTE_PROMPT => '',
+            SmpConstants::OPT_CRON_KEY => '',
         ];
 
         return $defaults[$option] ?? null;
@@ -374,6 +375,79 @@ class SmpAdmin
             'label' => 'Configure automatic daily postings. Select target accounts in the Content Type Settings above for "Question of the Day" and "Quote of the Day".',
         ];
 
+        // Cron key
+        $cronKey = qa_opt(SmpConstants::OPT_CRON_KEY);
+        $cronUrl = $cronKey
+            ? rtrim(qa_opt('site_url'), '/') . '/qa-plugin/social-media-poster/cron.php?key=' . urlencode($cronKey)
+            : '';
+        $cronCliPath = $cronKey
+            ? 'php ' . __DIR__ . '/cron.php --key=' . $cronKey
+            : '';
+        $fields['cron_key'] = [
+            'label' => 'Cron Secret Key:',
+            'type' => 'text',
+            'value' => $cronKey,
+            'tags' => 'NAME="smp_cron_key" SIZE="40"',
+            'note' => 'Set any random secret string to enable cron-based exact-time posting.',
+        ];
+
+        // Cron setup instructions
+        if ($cronKey) {
+            $cronHtml = '<div style="background:#f5f0ff;border:1px solid #d1c4e9;border-radius:6px;padding:14px 18px;margin:5px 0 10px;font-size:12px;">'
+                . '<strong style="color:#6a1b9a;">Cron Job Setup</strong> &mdash; Add one of these to your crontab (<code>crontab -e</code>):<br><br>'
+                . '<strong>Via HTTP (curl):</strong><br>'
+                . '<code style="display:block;background:#fff;padding:6px 10px;border-radius:3px;margin:4px 0 10px;word-break:break-all;font-size:11px;">'
+                . '0 * * * * curl -s &quot;' . htmlspecialchars($cronUrl, ENT_QUOTES, 'UTF-8') . '&quot; &gt; /dev/null 2&gt;&amp;1'
+                . '</code>'
+                . '<strong>Via PHP CLI:</strong><br>'
+                . '<code style="display:block;background:#fff;padding:6px 10px;border-radius:3px;margin:4px 0 8px;word-break:break-all;font-size:11px;">'
+                . '0 * * * * ' . htmlspecialchars($cronCliPath, ENT_QUOTES, 'UTF-8') . ' &gt; /dev/null 2&gt;&amp;1'
+                . '</code>'
+                . '<span style="color:#666;">Runs every hour. Posts only trigger at the configured hour if not already posted today.</span>'
+                . '</div>';
+        } else {
+            $cronHtml = '<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:6px;padding:10px 14px;margin:5px 0 10px;font-size:12px;color:#6d4c00;">'
+                . 'Set a cron secret key above and save to see cron job setup instructions. '
+                . 'Without cron, posts trigger on the first page load after the configured hour.'
+                . '</div>';
+        }
+        $fields['cron_info'] = [
+            'type' => 'static',
+            'label' => $cronHtml,
+        ];
+
+        // Server & browser timezone info
+        // Detect system timezone (PHP may default to UTC even if system is IST)
+        $systemTz = @trim(shell_exec('cat /etc/timezone 2>/dev/null'))
+            ?: @trim(shell_exec("timedatectl 2>/dev/null | grep 'Time zone' | awk '{print $3}'"))
+            ?: date_default_timezone_get();
+        $prevTz = date_default_timezone_get();
+        date_default_timezone_set($systemTz);
+        $serverTime = date('Y-m-d H:i:s');
+        $serverAbbr = date('T');
+        $serverUtcOffset = date('P');
+        date_default_timezone_set($prevTz); // restore
+
+        $tzNote = '<span style="font-size:12px;">'
+            . 'Server: <strong>' . htmlspecialchars($serverTime) . '</strong> '
+            . htmlspecialchars($systemTz) . ' (' . $serverAbbr . ', UTC' . $serverUtcOffset . ')'
+            . ' &nbsp;|&nbsp; <span id="smp-user-tz"></span>'
+            . '</span>'
+            . '<script>'
+            . '(function(){'
+            . 'var d=new Date();'
+            . 'var tz=Intl.DateTimeFormat().resolvedOptions().timeZone;'
+            . 'var t=d.toLocaleString("sv-SE",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"});'
+            . 'var o=d.getTimezoneOffset(),s=o<=0?"+":"-",h=Math.floor(Math.abs(o)/60),m=Math.abs(o)%60;'
+            . 'var off="UTC"+s+("0"+h).slice(-2)+":"+("0"+m).slice(-2);'
+            . 'document.getElementById("smp-user-tz").innerHTML="Your browser: <strong>"+t+"</strong> ("+tz+", "+off+")";'
+            . '})();'
+            . '</script>';
+        $fields['timezone_info'] = [
+            'type' => 'static',
+            'label' => $tzNote,
+        ];
+
         // -- QOTD --
         $fields['qotd_header'] = [
             'type' => 'static',
@@ -398,7 +472,7 @@ class SmpAdmin
             'label' => 'Post at hour (server time):',
             'type' => 'static',
             'label' => 'Post at hour (server time): <select name="smp_qotd_hour">' . $hourOptions . '</select>',
-            'note' => 'Server time is currently ' . date('H:i') . '. Post triggers on first page load after this hour.',
+            'note' => 'With cron: schedule one entry per hour. Without cron: triggers on first page load after this hour.',
         ];
 
         // Build category autocomplete widget
@@ -566,7 +640,7 @@ class SmpAdmin
         $fields['quote_hour'] = [
             'type' => 'static',
             'label' => 'Post at hour (server time): <select name="smp_quote_hour">' . $quoteHourOptions . '</select>',
-            'note' => 'Server time is currently ' . date('H:i'),
+            'note' => 'With cron: schedule one entry per hour. Without cron: triggers on first page load after this hour.',
         ];
 
         $fields['quote_prompt'] = [
@@ -1390,6 +1464,9 @@ class SmpAdmin
         $quoteHour = (int)qa_post_text('smp_quote_hour');
         qa_opt(SmpConstants::OPT_QUOTE_HOUR, max(0, min(23, $quoteHour)));
         qa_opt(SmpConstants::OPT_QUOTE_PROMPT, qa_post_text('smp_quote_prompt'));
+
+        $cronKey = trim(qa_post_text('smp_cron_key') ?? '');
+        qa_opt(SmpConstants::OPT_CRON_KEY, $cronKey);
     }
 
     private function saveCategoryRouting(): void
