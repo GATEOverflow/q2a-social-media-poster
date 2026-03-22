@@ -20,6 +20,8 @@ Automatically post your Q2A content to multiple social media platforms. Supports
 - PHP 7.4+
 - cURL extension
 - GD extension (for image generation)
+- Node.js 14+ (for server-side LaTeX/math rendering in QOTD images)
+- wkhtmltoimage 0.12.6+ with patched Qt (for HTML-to-image conversion)
 - ffmpeg (optional, for YouTube Shorts video generation)
 
 ## Installation
@@ -37,6 +39,43 @@ Automatically post your Q2A content to multiple social media platforms. Supports
    ```
 5. Go to Admin → Plugins and you should see "Social Media Poster"
 6. Configure your accounts in the plugin settings
+
+### KaTeX (LaTeX Math Rendering)
+
+The QOTD image generator uses KaTeX to render LaTeX math expressions. Install it via npm from the plugin directory:
+
+```bash
+cd /path/to/qa-plugin/social-media-poster
+npm install katex
+```
+
+This creates a `node_modules/katex/` folder used by `katex-render.js` for server-side math rendering. The `node_modules/` directory is in `.gitignore`, so **you must run this after every fresh clone or deployment**.
+
+Verify it works:
+
+```bash
+echo 'Test $\frac{1}{2}$' | node katex-render.js
+```
+
+You should see HTML output with `<span class="katex">` tags and a summary like `1 katex span found`.
+
+### wkhtmltoimage
+
+Install the patched Qt version of wkhtmltoimage (the standard version doesn't support local file access for CSS/fonts):
+
+```bash
+# Ubuntu/Debian
+sudo apt-get install wkhtmltopdf
+```
+
+Or download the patched binary from [wkhtmltopdf.org/downloads.html](https://wkhtmltopdf.org/downloads.html).
+
+Verify:
+
+```bash
+wkhtmltoimage --version
+# Should show 0.12.6 (with patched qt)
+```
 
 ## Configuration
 
@@ -240,6 +279,14 @@ The plugin listens for these Q2A events:
 - Ensure GD extension is installed and enabled
 - Check that `qa-uploads/smp-images/` exists and is writable by the web server (`www-data`)
 - If using a separate document root with symlinks, ensure `qa-uploads` is symlinked into the public document root
+
+**LaTeX/math not rendering in QOTD images?**
+- Ensure Node.js is installed and accessible to the web server user: `sudo -u www-data node --version`
+- Ensure KaTeX is installed: `ls node_modules/katex/dist/katex.min.css` (from the plugin directory)
+- If missing, run `npm install katex` from the plugin directory
+- Test rendering: `echo 'Test $\frac{1}{2}$' | node katex-render.js`
+- Ensure wkhtmltoimage is installed: `sudo -u www-data wkhtmltoimage --version`
+- After updating PHP files, reload Apache to clear opcache: `sudo service apache2 reload`
 
 **Instagram "media couldn't be fetched" error?**
 - The image URL must be publicly accessible to Facebook's servers
