@@ -1632,10 +1632,14 @@ class SmpAdmin
         $title = $question['title'];
         $url = qa_q_path($postId, $title, true);
 
+        // Build tag hashtags from question's tags
+        $tags = $question['tags'] ?? '';
+        $tagHashtags = $this->tagsToHashtags($tags);
+
         // Caption: just title + link (image has the full question content)
         $messageText = "📝 Question of the Day\n\n" . $title . "\n\n";
         $messageText .= "🔗 Answer & Discussion: " . $url;
-        $messageText .= "\n\n#QuestionOfTheDay #QOTD";
+        $messageText .= "\n\n#QuestionOfTheDay #QOTD" . (!empty($tagHashtags) ? ' ' . $tagHashtags : '');
 
         // Optionally enhance with OpenAI
         $message = $poster->openaiGenerateMessage(
@@ -1661,25 +1665,60 @@ class SmpAdmin
      */
     private function fetchRandomMcqForTest(array $excludePostIds = []): ?array
     {
+        // Use Q2A's basic selectspec so any plugin overrides/filtering get applied
+        require_once QA_INCLUDE_DIR . 'db/selects.php';
+        $selectspec = qa_db_posts_basic_selectspec(null, true, false);
+        $baseSource = $selectspec['source'];
+
         $excludeWhere = '';
         if (!empty($excludePostIds)) {
-            $excludeWhere = ' AND p.postid NOT IN (' . implode(',', array_map('intval', $excludePostIds)) . ')';
+            $excludeWhere = ' AND ^posts.postid NOT IN (' . implode(',', array_map('intval', $excludePostIds)) . ')';
         }
 
         $result = qa_db_query_sub(
-            "SELECT p.postid, p.title, p.content, p.tags "
-            . "FROM ^posts p "
-            . "JOIN ^ec_answers a ON p.postid = a.postid "
-            . "WHERE p.type = 'Q' "
+            "SELECT ^posts.postid, ^posts.title, ^posts.content, ^posts.tags "
+            . "FROM " . $baseSource . " "
+            . "JOIN ^ec_answers a ON ^posts.postid = a.postid "
+            . "WHERE ^posts.type = 'Q' "
+            . "AND ^posts.closedbyid IS NULL "
             . "AND a.answer_str != '' "
-            . "AND LENGTH(p.content) < 2000 "
-            . "AND p.tags NOT LIKE '%numerical-answers%' "
-            . "AND p.tags NOT LIKE '%multiple-selects%' "
+            . "AND LENGTH(^posts.content) < 2000 "
+            . "AND ^posts.tags NOT LIKE '%numerical-answers%' "
+            . "AND ^posts.tags NOT LIKE '%multiple-selects%' "
             . $excludeWhere
             . " ORDER BY RAND() LIMIT 1"
         );
         $row = qa_db_read_one_assoc($result, true);
         return $row ?: null;
+    }
+
+    /**
+     * Convert Q2A comma-separated tags to hashtag string.
+     * E.g. "gate-cse-2025,digital-logic" → "#GateCse2025 #DigitalLogic"
+     */
+    private function tagsToHashtags(string $tags): string
+    {
+        if (empty(trim($tags))) {
+            return '';
+        }
+
+        $tagList = array_map('trim', explode(',', $tags));
+        $hashtags = [];
+
+        foreach ($tagList as $tag) {
+            if (empty($tag)) {
+                continue;
+            }
+            // Convert hyphenated-tag to CamelCase: "digital-logic" → "DigitalLogic"
+            $camel = str_replace(' ', '', ucwords(str_replace('-', ' ', $tag)));
+            // Remove any non-alphanumeric characters
+            $camel = preg_replace('/[^a-zA-Z0-9]/', '', $camel);
+            if (!empty($camel)) {
+                $hashtags[] = '#' . $camel;
+            }
+        }
+
+        return implode(' ', $hashtags);
     }
 
     /**

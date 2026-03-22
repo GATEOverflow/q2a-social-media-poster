@@ -129,11 +129,14 @@ class SmpDailyPoster
         // Strip HTML for text content
         $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
 
+        // Build tag hashtags from question's tags
+        $tagHashtags = $this->tagsToHashtags($tags);
+
         // Build the QOTD message (image has the full question, caption just has link)
         $messagePrefix = "📝 Question of the Day\n\n";
         $messagePrefix .= $title . "\n\n";
         $messagePrefix .= "🔗 Answer & Discussion: " . $url;
-        $messagePrefix .= "\n\n#QuestionOfTheDay #QOTD";
+        $messagePrefix .= "\n\n#QuestionOfTheDay #QOTD" . (!empty($tagHashtags) ? ' ' . $tagHashtags : '');
 
         // Optionally enhance with OpenAI
         $message = $poster->openaiGenerateMessage(
@@ -233,6 +236,11 @@ class SmpDailyPoster
         $excludeTags = qa_opt(SmpConstants::OPT_QOTD_EXCLUDE_TAGS);
         $categories = qa_opt(SmpConstants::OPT_QOTD_CATEGORIES);
 
+        // Use Q2A's basic selectspec so any plugin overrides/filtering get applied
+        require_once QA_INCLUDE_DIR . 'db/selects.php';
+        $selectspec = qa_db_posts_basic_selectspec(null, true, false);
+        $baseSource = $selectspec['source'];
+
         // Build the exclusion tag condition
         // Always exclude numerical-answers and multiple-selects
         $tagExclusions = ['numerical-answers', 'multiple-selects', 'numerical answers'];
@@ -245,7 +253,7 @@ class SmpDailyPoster
         $tagConditions = [];
         foreach ($tagExclusions as $tag) {
             $escapedTag = qa_db_escape_string($tag);
-            $tagConditions[] = "p.tags NOT LIKE '%" . $escapedTag . "%'";
+            $tagConditions[] = "^posts.tags NOT LIKE '%" . $escapedTag . "%'";
         }
         $tagWhere = implode(' AND ', $tagConditions);
 
@@ -254,7 +262,7 @@ class SmpDailyPoster
         if (!empty($categories)) {
             $catIds = array_map('intval', array_filter(explode(',', $categories)));
             if (!empty($catIds)) {
-                $catWhere = ' AND p.categoryid IN (' . implode(',', $catIds) . ')';
+                $catWhere = ' AND ^posts.categoryid IN (' . implode(',', $catIds) . ')';
             }
         }
 
@@ -265,16 +273,17 @@ class SmpDailyPoster
         }
         $excludeWhere = '';
         if (!empty($excludeIds)) {
-            $excludeWhere = ' AND p.postid NOT IN (' . implode(',', array_map('intval', $excludeIds)) . ')';
+            $excludeWhere = ' AND ^posts.postid NOT IN (' . implode(',', array_map('intval', $excludeIds)) . ')';
         }
 
         // Limit content length to avoid questions that won't fit in the image
-        $query = "SELECT p.postid, p.title, p.content, p.tags, a.answer_str "
-            . "FROM ^posts p "
-            . "JOIN ^ec_answers a ON p.postid = a.postid "
-            . "WHERE p.type = 'Q' "
+        $query = "SELECT ^posts.postid, ^posts.title, ^posts.content, ^posts.tags, a.answer_str "
+            . "FROM " . $baseSource . " "
+            . "JOIN ^ec_answers a ON ^posts.postid = a.postid "
+            . "WHERE ^posts.type = 'Q' "
+            . "AND ^posts.closedbyid IS NULL "
             . "AND a.answer_str != '' "
-            . "AND LENGTH(p.content) < 2000 "
+            . "AND LENGTH(^posts.content) < 2000 "
             . "AND " . $tagWhere
             . $catWhere
             . $excludeWhere
@@ -284,6 +293,35 @@ class SmpDailyPoster
         $row = qa_db_read_one_assoc($result, true);
 
         return $row ?: null;
+    }
+
+    /**
+     * Convert Q2A comma-separated tags to hashtag string.
+     * E.g. "gate-cse-2025,digital-logic" → "#GateCse2025 #DigitalLogic"
+     */
+    private function tagsToHashtags(string $tags): string
+    {
+        if (empty(trim($tags))) {
+            return '';
+        }
+
+        $tagList = array_map('trim', explode(',', $tags));
+        $hashtags = [];
+
+        foreach ($tagList as $tag) {
+            if (empty($tag)) {
+                continue;
+            }
+            // Convert hyphenated-tag to CamelCase: "digital-logic" → "DigitalLogic"
+            $camel = str_replace(' ', '', ucwords(str_replace('-', ' ', $tag)));
+            // Remove any non-alphanumeric characters
+            $camel = preg_replace('/[^a-zA-Z0-9]/', '', $camel);
+            if (!empty($camel)) {
+                $hashtags[] = '#' . $camel;
+            }
+        }
+
+        return implode(' ', $hashtags);
     }
 
     /**
