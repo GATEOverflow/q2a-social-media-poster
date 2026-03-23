@@ -104,7 +104,7 @@ class SmpImageGenerator
                 @unlink($measurePng);
 
                 // If content exceeds the target height, it won't fit — return null
-                if ($naturalHeight > $h + 50) {
+                if ($naturalHeight > $h + 80) {
                     @unlink($tempHtml);
                     return null;
                 }
@@ -195,31 +195,31 @@ class SmpImageGenerator
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#1a1a2e;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:6px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)}
-.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:120px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
-.header{text-align:center;padding:40px 60px 0;position:relative;z-index:1}
-.header .logo{height:52px;width:auto;margin-bottom:14px;display:block;margin-left:auto;margin-right:auto}
-.badge{text-align:center;margin-bottom:24px;position:relative;z-index:1}
-.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:20px;font-weight:700;letter-spacing:2.5px;padding:10px 30px;border-radius:22px}
-.content{padding:0 60px 100px;position:relative;z-index:1}
-.question-card{background:#f8fafc;border-radius:16px;padding:36px 40px;border-left:5px solid #2563EB;margin-bottom:24px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-.question-card p,.question-card{font-size:34px;line-height:1.55;color:#1a1a2e}
-.question-card ol,.question-card ul{margin:14px 0 14px 32px;font-size:32px;line-height:1.5;color:#334155}
-.question-card ol li,.question-card ul li{margin-bottom:8px}
-.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:8px;padding:3px 10px;font-size:30px;color:#3730a3}
-.question-card pre{display:block;padding:16px 20px;margin:14px 0;overflow-x:hidden;white-space:pre-wrap}
-.question-card table{border-collapse:collapse;margin:14px 0;font-size:30px}
-.question-card td,.question-card th{border:1px solid #e2e8f0;padding:10px 16px}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:110px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.header{text-align:center;padding:20px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
+.badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
+.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:18px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.content{padding:0 50px 72px;position:relative;z-index:1}
+.question-card{background:#f8fafc;border-radius:14px;padding:24px 30px;border-left:5px solid #2563EB;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.question-card p,.question-card{font-size:30px;line-height:1.5;color:#1a1a2e}
+.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:28px;line-height:1.45;color:#334155}
+.question-card ol li,.question-card ul li{margin-bottom:5px}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:6px;padding:2px 8px;font-size:26px;color:#3730a3}
+.question-card pre{display:block;padding:12px 16px;margin:10px 0;overflow-x:hidden;white-space:pre-wrap}
+.question-card table{border-collapse:collapse;margin:10px 0;font-size:26px}
+.question-card td,.question-card th{border:1px solid #e2e8f0;padding:8px 14px}
 .question-card img{max-width:100%;border-radius:8px}
 .options{margin:0}
-.option{background:#f1f5f9;border-radius:14px;padding:20px 28px;margin-bottom:14px;display:table;width:100%;border:1px solid #e2e8f0}
-.option-label{display:table-cell;width:50px;height:50px;min-width:50px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:24px;color:#fff}
-.option-text{display:table-cell;vertical-align:middle;padding-left:24px;font-size:30px;line-height:1.45;color:#334155}
-.branding{position:absolute;bottom:28px;left:60px;right:60px;border-top:2px solid #e2e8f0;padding-top:14px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:22px;font-weight:700;color:#64748b}
-.branding .url{font-size:18px;color:#94a3b8}
-.katex{font-size:1.1em!important;color:#1a1a2e!important}
-.katex-display{margin:0.3em 0!important}
+.option{background:#f1f5f9;border-radius:12px;padding:14px 22px;margin-bottom:10px;display:table;width:100%;border:1px solid #e2e8f0}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:22px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:27px;line-height:1.4;color:#334155}
+.branding{position:absolute;bottom:20px;left:50px;right:50px;border-top:2px solid #e2e8f0;padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:#64748b}
+.branding .url{font-size:17px;color:#94a3b8}
+.katex{font-size:1.05em!important;color:#1a1a2e!important}
+.katex-display{margin:0.2em 0!important}
 .katex .mfrac .frac-line{border-bottom-color:#1a1a2e!important}
 .katex .vlist-t2 .vlist-r .vlist .mord,.katex .mord,.katex .mrel,.katex .mbin,.katex .mpunct,.katex .mopen,.katex .mclose,.katex .minner{color:#1a1a2e!important}
 </style></head><body>

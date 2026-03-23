@@ -283,7 +283,7 @@ class SmpDailyPoster
             . "WHERE ^posts.type = 'Q' "
             . "AND ^posts.closedbyid IS NULL "
             . "AND a.answer_str != '' "
-            . "AND LENGTH(^posts.content) < 2000 "
+            . "AND LENGTH(^posts.content) < 1500 "
             . "AND " . $tagWhere
             . $catWhere
             . $excludeWhere

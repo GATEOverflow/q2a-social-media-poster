@@ -1682,7 +1682,7 @@ class SmpAdmin
             . "WHERE ^posts.type = 'Q' "
             . "AND ^posts.closedbyid IS NULL "
             . "AND a.answer_str != '' "
-            . "AND LENGTH(^posts.content) < 2000 "
+            . "AND LENGTH(^posts.content) < 1500 "
             . "AND ^posts.tags NOT LIKE '%numerical-answers%' "
             . "AND ^posts.tags NOT LIKE '%multiple-selects%' "
             . $excludeWhere
@@ -1800,30 +1800,36 @@ class SmpAdmin
     {
         require_once $this->directory . 'SmpImageGenerator.php';
 
-        $question = $this->fetchRandomMcqForTest();
-        if (!$question) {
-            return '❌ Preview failed: No eligible MCQ question found.';
-        }
-
-        $title = $question['title'];
-        $content = $question['content'];
-        $postId = (int)$question['postid'];
-
         $imageGen = new SmpImageGenerator();
-        $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
+        $excludeIds = [];
+        $maxAttempts = 5;
 
-        if (empty($imageUrl)) {
-            return '❌ Preview failed: Image generation failed.';
+        for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
+            $question = $this->fetchRandomMcqForTest($excludeIds);
+            if (!$question) {
+                break;
+            }
+
+            $title = $question['title'];
+            $content = $question['content'];
+            $postId = (int)$question['postid'];
+            $excludeIds[] = $postId;
+
+            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
+
+            if (!empty($imageUrl)) {
+                $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
+                return '<div id="smp-preview-panel" style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
+                    . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+                    . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📝 QOTD Preview — Post #' . $postId . '</span>'
+                    . '<button onclick="document.getElementById(\'smp-preview-panel\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
+                    . '</div>'
+                    . '<a href="' . $safeUrl . '" target="_blank">'
+                    . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
+            }
         }
 
-        $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');
-        return '<div id="smp-preview-panel" style="margin:20px 0;padding:20px;background:#fff;border:1px solid #dadce0;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.12);max-width:540px;">'
-            . '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
-            . '<span style="font-size:14px;font-weight:500;color:#1a73e8;">📝 QOTD Preview — Post #' . $postId . '</span>'
-            . '<button onclick="document.getElementById(\'smp-preview-panel\').remove()" style="background:none;border:none;color:#5f6368;font-size:20px;cursor:pointer;padding:4px 8px;border-radius:50%;line-height:1;" onmouseover="this.style.background=\'#f1f3f4\'" onmouseout="this.style.background=\'none\'">✕</button>'
-            . '</div>'
-            . '<a href="' . $safeUrl . '" target="_blank">'
-            . '<img src="' . $safeUrl . '" style="max-width:500px;width:100%;border-radius:8px;display:block;" /></a></div>';
+        return '❌ Preview failed: Could not generate image after ' . $maxAttempts . ' attempts (content too large to fit).';
     }
 
     private function saveGeneralSettings(): void
