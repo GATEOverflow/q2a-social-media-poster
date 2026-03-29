@@ -38,6 +38,28 @@ class SmpDailyPoster
         $currentHour = (int)date('G');
         $today = date('Y-m-d');
 
+        // Random delay up to 30 minutes to avoid bot-like fixed-time posting
+        $needsPost = false;
+
+        if (qa_opt(SmpConstants::OPT_QOTD_ENABLED)) {
+            $qotdHour = (int)(qa_opt(SmpConstants::OPT_QOTD_HOUR) ?: 9);
+            $qotdLastDate = substr(qa_opt(SmpConstants::OPT_QOTD_LAST_RUN), 0, 10);
+            if ($currentHour >= $qotdHour && $qotdLastDate !== $today)
+                $needsPost = true;
+        }
+
+        if (qa_opt(SmpConstants::OPT_QUOTE_ENABLED)) {
+            $quoteHour = (int)(qa_opt(SmpConstants::OPT_QUOTE_HOUR) ?: 8);
+            $quoteLastDate = substr(qa_opt(SmpConstants::OPT_QUOTE_LAST_RUN), 0, 10);
+            if ($currentHour >= $quoteHour && $quoteLastDate !== $today)
+                $needsPost = true;
+        }
+
+        if ($needsPost) {
+            $delaySecs = random_int(0, 1800); // 0 to 30 minutes
+            sleep($delaySecs);
+        }
+
         // Question of the Day
         if (qa_opt(SmpConstants::OPT_QOTD_ENABLED)) {
             $qotdHour = (int)(qa_opt(SmpConstants::OPT_QOTD_HOUR) ?: 9);

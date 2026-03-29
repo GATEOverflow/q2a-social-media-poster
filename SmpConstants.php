@@ -33,6 +33,29 @@ class SmpConstants
     const OPT_IMAGE_TEXT_COLOR = 'smp_image_text_color';
     const OPT_IMAGE_FONT_SIZE = 'smp_image_font_size';
     const OPT_IMAGE_LOGO_URL = 'smp_image_logo_url';
+    const OPT_IMAGE_STYLE = 'smp_image_style';
+    const OPT_IMAGE_SITE_NAME = 'smp_image_site_name';
+    const OPT_IMAGE_TEMPLATE = 'smp_image_template';
+    const OPT_IMAGE_CSS_LIGHT = 'smp_image_css_light';
+    const OPT_IMAGE_CSS_DARK = 'smp_image_css_dark';
+
+    // Quote template
+    const OPT_QUOTE_TEMPLATE = 'smp_quote_template';
+    const OPT_QUOTE_CSS = 'smp_quote_css';
+    const OPT_QUOTE_CSS_LIGHT = 'smp_quote_css_light';
+    const OPT_QUOTE_CSS_DARK = 'smp_quote_css_dark';
+
+    // Exam template
+    const OPT_EXAM_TEMPLATE = 'smp_exam_template';
+    const OPT_EXAM_CSS = 'smp_exam_css';
+    const OPT_EXAM_CSS_LIGHT = 'smp_exam_css_light';
+    const OPT_EXAM_CSS_DARK = 'smp_exam_css_dark';
+
+    // Job template
+    const OPT_JOB_TEMPLATE = 'smp_job_template';
+    const OPT_JOB_CSS = 'smp_job_css';
+    const OPT_JOB_CSS_LIGHT = 'smp_job_css_light';
+    const OPT_JOB_CSS_DARK = 'smp_job_css_dark';
     const OPT_YOUTUBE_AUTO_VIDEO = 'smp_youtube_auto_video';
     const OPT_LAST_EXPIRY_CHECK = 'smp_last_expiry_check';
     const OPT_EXPIRY_NOTIFIED = 'smp_expiry_notified';

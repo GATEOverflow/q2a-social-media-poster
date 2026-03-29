@@ -64,7 +64,8 @@ class SmpImageGenerator
         $w = $this->width;
         $h = $this->height;
 
-        $siteName = htmlspecialchars(qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
+        $customSiteName = qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME);
+        $siteName = htmlspecialchars($customSiteName ?: qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
         $siteHost = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
 
         // Build options HTML
@@ -189,53 +190,365 @@ class SmpImageGenerator
             $logoTag = '<img class="logo" src="data:' . $logoMime . ';base64,' . $logoData . '" alt="">';
         }
 
-        return '<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<link rel="stylesheet" href="' . $katexCssUrl . '">
-<style>
+        $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
+
+        if ($style === 'dark') {
+            $customCss = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+            $css = !empty(trim($customCss ?? '')) ? $customCss : $this->getQotdCssDark();
+        } else {
+            $customCss = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+            $css = !empty(trim($customCss ?? '')) ? $customCss : $this->getQotdCssLight();
+        }
+        $css = str_replace(['{{WIDTH}}', '{{HEIGHT}}'], [$w, $h], $css);
+
+        $customTemplate = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        if (!empty(trim($customTemplate ?? ''))) {
+            $template = $customTemplate;
+        } else {
+            $template = $this->getDefaultTemplate();
+        }
+
+        return str_replace(
+            ['{{KATEX_CSS}}', '{{CSS}}', '{{SITE_NAME}}', '{{LOGO}}', '{{QUESTION}}', '{{OPTIONS}}', '{{SITE_URL}}'],
+            [$katexCssUrl, $css, $siteName, $logoTag, $questionHtml, $optionsDivs, $siteHost],
+            $template
+        );
+    }
+
+    private function getQotdCssLight(): string
+    {
+        return '
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#1a1a2e;position:relative;overflow:hidden}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#ffffff;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#1a1a2e;position:relative;overflow:hidden}
 .accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)}
-.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:110px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:132px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
 .header{text-align:center;padding:20px 50px 0;position:relative;z-index:1}
 .header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
 .badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
-.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:18px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
 .content{padding:0 50px 72px;position:relative;z-index:1}
 .question-card{background:#f8fafc;border-radius:14px;padding:24px 30px;border-left:5px solid #2563EB;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
-.question-card p,.question-card{font-size:30px;line-height:1.5;color:#1a1a2e}
-.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:28px;line-height:1.45;color:#334155}
+.question-card p,.question-card{font-size:36px;line-height:1.5;color:#1a1a2e}
+.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:34px;line-height:1.45;color:#334155}
 .question-card ol li,.question-card ul li{margin-bottom:5px}
-.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:6px;padding:2px 8px;font-size:26px;color:#3730a3}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:6px;padding:2px 8px;font-size:31px;color:#3730a3}
 .question-card pre{display:block;padding:12px 16px;margin:10px 0;overflow-x:hidden;white-space:pre-wrap}
-.question-card table{border-collapse:collapse;margin:10px 0;font-size:26px}
+.question-card table{border-collapse:collapse;margin:10px 0;font-size:31px}
 .question-card td,.question-card th{border:1px solid #e2e8f0;padding:8px 14px}
 .question-card img{max-width:100%;border-radius:8px}
 .options{margin:0}
 .option{background:#f1f5f9;border-radius:12px;padding:14px 22px;margin-bottom:10px;display:table;width:100%;border:1px solid #e2e8f0}
-.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:22px;color:#fff}
-.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:27px;line-height:1.4;color:#334155}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:26px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:32px;line-height:1.4;color:#334155}
 .branding{position:absolute;bottom:20px;left:50px;right:50px;border-top:2px solid #e2e8f0;padding-top:10px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:20px;font-weight:700;color:#64748b}
-.branding .url{font-size:17px;color:#94a3b8}
+.branding .site{font-size:24px;font-weight:700;color:#64748b}
+.branding .url{font-size:20px;color:#94a3b8}
 .katex{font-size:1.05em!important;color:#1a1a2e!important}
 .katex-display{margin:0.2em 0!important}
 .katex .mfrac .frac-line{border-bottom-color:#1a1a2e!important}
 .katex .vlist-t2 .vlist-r .vlist .mord,.katex .mord,.katex .mrel,.katex .mbin,.katex .mpunct,.katex .mopen,.katex .mclose,.katex .minner{color:#1a1a2e!important}
-</style></head><body>
+';
+    }
+
+    private function getQotdCssDark(): string
+    {
+        return '
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#e2e8f0;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:132px;font-weight:900;color:rgba(255,255,255,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.header{text-align:center;padding:20px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.2)}
+.badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
+.badge span{display:inline-block;background:#6366f1;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.content{padding:0 50px 72px;position:relative;z-index:1}
+.question-card{background:#1e293b;border-radius:14px;padding:24px 30px;border-left:5px solid #6366f1;margin-bottom:16px;box-shadow:0 2px 16px rgba(0,0,0,0.3)}
+.question-card p,.question-card{font-size:36px;line-height:1.5;color:#e2e8f0}
+.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:34px;line-height:1.45;color:#cbd5e1}
+.question-card ol li,.question-card ul li{margin-bottom:5px}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#334155;border-radius:6px;padding:2px 8px;font-size:31px;color:#a5b4fc}
+.question-card pre{display:block;padding:12px 16px;margin:10px 0;overflow-x:hidden;white-space:pre-wrap}
+.question-card table{border-collapse:collapse;margin:10px 0;font-size:31px}
+.question-card td,.question-card th{border:1px solid #334155;padding:8px 14px;color:#cbd5e1}
+.question-card img{max-width:100%;border-radius:8px}
+.options{margin:0}
+.option{background:#1e293b;border-radius:12px;padding:14px 22px;margin-bottom:10px;display:table;width:100%;border:1px solid #334155}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#6366f1;text-align:center;vertical-align:middle;font-weight:700;font-size:26px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:32px;line-height:1.4;color:#cbd5e1}
+.branding{position:absolute;bottom:20px;left:50px;right:50px;border-top:2px solid #334155;padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:24px;font-weight:700;color:#94a3b8}
+.branding .url{font-size:20px;color:#64748b}
+.katex{font-size:1.05em!important;color:#e2e8f0!important}
+.katex-display{margin:0.2em 0!important}
+.katex .mfrac .frac-line{border-bottom-color:#e2e8f0!important}
+.katex .vlist-t2 .vlist-r .vlist .mord,.katex .mord,.katex .mrel,.katex .mbin,.katex .mpunct,.katex .mopen,.katex .mclose,.katex .minner{color:#e2e8f0!important}
+';
+    }
+
+    private function getDefaultTemplate(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="{{KATEX_CSS}}">
+<style>{{CSS}}</style></head><body>
 <div class="accent-bar"></div>
-<div class="watermark">' . $siteName . '</div>
-<div class="header">' . $logoTag . '</div>
+<div class="watermark">{{SITE_NAME}}</div>
+<div class="header">{{LOGO}}</div>
 <div class="badge"><span>QUESTION OF THE DAY</span></div>
 <div class="content">
-<div class="question-card">' . $questionHtml . '</div>
-<div class="options">' . $optionsDivs . '</div>
+<div class="question-card">{{QUESTION}}</div>
+<div class="options">{{OPTIONS}}</div>
 </div>
 <div class="branding">
-<span class="site">' . $siteName . '</span>
-<span class="url">' . $siteHost . '</span>
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
 </div>
 </body></html>';
+    }
+
+    /**
+     * Render an HTML string to a PNG image via wkhtmltoimage. Returns image URL or null.
+     */
+    private function renderHtmlToImage(string $html, string $prefix): ?string
+    {
+        $w = $this->width;
+        $h = $this->height;
+        $tempHtml = tempnam(sys_get_temp_dir(), 'smp_' . $prefix . '_') . '.html';
+        $tempPng = tempnam(sys_get_temp_dir(), 'smp_' . $prefix . '_') . '.png';
+        file_put_contents($tempHtml, $html);
+
+        $cmd = sprintf(
+            'wkhtmltoimage --enable-local-file-access --disable-javascript --width %d --height %d --quality 95 --disable-smart-width --quiet %s %s 2>&1',
+            $w, $h,
+            escapeshellarg($tempHtml),
+            escapeshellarg($tempPng)
+        );
+        exec($cmd, $output, $exitCode);
+        @unlink($tempHtml);
+
+        if ($exitCode !== 0 || !file_exists($tempPng)) {
+            @unlink($tempPng);
+            return null;
+        }
+
+        $img = imagecreatefrompng($tempPng);
+        @unlink($tempPng);
+        if (!$img) {
+            return null;
+        }
+
+        return $this->saveImage($img, $prefix . '_' . time());
+    }
+
+    /**
+     * Get common substitution data (logo tag, site name, site URL).
+     */
+    private function getCommonPlaceholders(): array
+    {
+        $logoTag = '';
+        if ($this->logoUrl && file_exists($this->logoUrl)) {
+            $logoData = base64_encode(file_get_contents($this->logoUrl));
+            $logoMime = mime_content_type($this->logoUrl) ?: 'image/png';
+            $logoTag = '<img class="logo" src="data:' . $logoMime . ';base64,' . $logoData . '" alt="">';
+        }
+        $customSiteName = qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME);
+        $siteName = htmlspecialchars($customSiteName ?: qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
+        $siteHost = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
+        return ['logo' => $logoTag, 'siteName' => $siteName, 'siteUrl' => $siteHost];
+    }
+
+    /**
+     * Build a full HTML page from a template, CSS, and placeholder values.
+     */
+    private function buildFromTemplate(string $templateOpt, string $cssLightOpt, string $cssDarkOpt, string $defaultTemplate, string $defaultCssLight, string $defaultCssDark, array $replacements): string
+    {
+        $template = qa_opt($templateOpt);
+        if (empty(trim($template ?? ''))) {
+            $template = $defaultTemplate;
+        }
+        $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
+        if ($style === 'dark') {
+            $css = qa_opt($cssDarkOpt);
+            if (empty(trim($css ?? ''))) {
+                $css = $defaultCssDark;
+            }
+        } else {
+            $css = qa_opt($cssLightOpt);
+            if (empty(trim($css ?? ''))) {
+                $css = $defaultCssLight;
+            }
+        }
+        $css = str_replace(['{{WIDTH}}', '{{HEIGHT}}'], [$this->width, $this->height], $css);
+        $replacements['{{CSS}}'] = $css;
+
+        return str_replace(array_keys($replacements), array_values($replacements), $template);
+    }
+
+    // ======================== Quote Templates ========================
+
+    private function getDefaultQuoteTemplate(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="badge"><span>QUOTE OF THE DAY</span></div>
+<div class="quote-mark open">&ldquo;</div>
+<div class="quote-body">{{QUOTE}}</div>
+<div class="quote-mark close">&rdquo;</div>
+<div class="attribution">{{ATTRIBUTION}}</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+<div class="hashtags">{{HASHTAGS}}</div>
+</body></html>';
+    }
+
+    private function getDefaultQuoteCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2a1152 0%,#0d1b3e 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#c792ea,#89b4fa,#a78bfa)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.badge{text-align:center;margin:10px 0 20px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(199,146,234,0.3);color:#c792ea;font-size:18px;font-weight:700;letter-spacing:3px;padding:6px 24px;border-radius:20px;border:1px solid rgba(199,146,234,0.4)}
+.quote-mark{text-align:center;font-family:Georgia,"DejaVu Serif",serif;color:#c792ea;position:relative;z-index:1;line-height:1}
+.quote-mark.open{font-size:120px;margin-bottom:-20px}
+.quote-mark.close{font-size:60px;margin-top:-10px}
+.quote-body{padding:0 80px;text-align:center;font-family:Georgia,"DejaVu Serif",serif;font-size:36px;line-height:1.6;color:#f0f0ff;position:relative;z-index:1}
+.attribution{text-align:center;padding:20px 80px 0;font-size:24px;color:rgba(200,200,230,0.7);position:relative;z-index:1}
+.branding{position:absolute;bottom:50px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}
+.hashtags{position:absolute;bottom:18px;left:50px;right:50px;text-align:center;font-size:14px;color:rgba(199,146,234,0.5)}';
+    }
+
+    private function getDefaultQuoteCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#1a0a2e 0%,#0a1628 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#a78bfa,#6366f1,#818cf8)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.badge{text-align:center;margin:10px 0 20px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(139,92,246,0.3);color:#a78bfa;font-size:18px;font-weight:700;letter-spacing:3px;padding:6px 24px;border-radius:20px;border:1px solid rgba(139,92,246,0.4)}
+.quote-mark{text-align:center;font-family:Georgia,"DejaVu Serif",serif;color:#a78bfa;position:relative;z-index:1;line-height:1}
+.quote-mark.open{font-size:120px;margin-bottom:-20px}
+.quote-mark.close{font-size:60px;margin-top:-10px}
+.quote-body{padding:0 80px;text-align:center;font-family:Georgia,"DejaVu Serif",serif;font-size:36px;line-height:1.6;color:#e2e8f0;position:relative;z-index:1}
+.attribution{text-align:center;padding:20px 80px 0;font-size:24px;color:rgba(148,163,184,0.7);position:relative;z-index:1}
+.branding{position:absolute;bottom:50px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}
+.hashtags{position:absolute;bottom:18px;left:50px;right:50px;text-align:center;font-size:14px;color:rgba(139,92,246,0.4)}';
+    }
+
+    // ======================== Exam Templates ========================
+
+    private function getDefaultExamTemplate(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="icon">&#x270F;</div>
+<div class="badge"><span>NEW EXAM</span></div>
+<div class="title">{{TITLE}}</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+</body></html>';
+    }
+
+    private function getDefaultExamCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#004d40 0%,#0d47a1 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#00e6be;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(0,200,170,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(0,200,170,0.4)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+    }
+
+    private function getDefaultExamCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#0a2a25 0%,#0a1832 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#2dd4bf;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(45,212,191,0.2);color:#5eead4;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(45,212,191,0.3)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
+    }
+
+    // ======================== Job Templates ========================
+
+    private function getDefaultJobTemplate(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="icon">&#x2605;</div>
+<div class="badge"><span>JOB OPENING</span></div>
+<div class="title">{{TITLE}}</div>
+<div class="cta">APPLY NOW</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+</body></html>';
+    }
+
+    private function getDefaultJobCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#880e4f 0%,#311b92 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#ffa726,#ffb74d,#ffcc02)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#ffb74d;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(255,167,38,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(255,167,38,0.4)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
+.cta{text-align:center;margin:40px auto 0;background:#ffa726;color:#311b42;font-size:22px;font-weight:700;letter-spacing:2px;padding:12px 40px;border-radius:8px;display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+    }
+
+    private function getDefaultJobCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d0a1e 0%,#1a0e3a 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#fb923c,#f97316,#fdba74)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#fb923c;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(251,146,60,0.2);color:#fdba74;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(251,146,60,0.3)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
+.cta{text-align:center;margin:40px auto 0;background:#fb923c;color:#1a0e3a;font-size:22px;font-weight:700;letter-spacing:2px;padding:12px 40px;border-radius:8px;display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
     }
 
     /**
@@ -761,6 +1074,57 @@ body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Sego
      */
     public function generateQuoteImage(string $quoteText): ?string
     {
+        // Try HTML template rendering via wkhtmltoimage first
+        $htmlResult = $this->generateQuoteFromHtml($quoteText);
+        if ($htmlResult !== null) {
+            return $htmlResult;
+        }
+
+        // Fallback to GD rendering
+        return $this->generateQuoteImageGd($quoteText);
+    }
+
+    private function generateQuoteFromHtml(string $quoteText): ?string
+    {
+        $common = $this->getCommonPlaceholders();
+
+        // Parse quote text
+        $rawQuote = html_entity_decode(strip_tags($quoteText), ENT_QUOTES, 'UTF-8');
+        $hashtags = '';
+        if (preg_match('/\s*((?:#\w+\s*){1,})\s*$/', $rawQuote, $m)) {
+            $hashtags = trim($m[1]);
+            $rawQuote = trim(substr($rawQuote, 0, -strlen($m[0])));
+        }
+        $attribution = '';
+        if (preg_match('/\s*[—–\-]\s*(.{3,80})$/u', $rawQuote, $m)) {
+            $attribution = '— ' . htmlspecialchars(trim($m[1]), ENT_QUOTES, 'UTF-8');
+            $rawQuote = trim(substr($rawQuote, 0, -strlen($m[0])));
+        }
+        $rawQuote = preg_replace('/^[\s"\'\x{201C}\x{201D}\x{2018}\x{2019}]+/u', '', $rawQuote);
+        $rawQuote = preg_replace('/[\s"\'\x{201C}\x{201D}\x{2018}\x{2019}]+$/u', '', $rawQuote);
+
+        $html = $this->buildFromTemplate(
+            SmpConstants::OPT_QUOTE_TEMPLATE,
+            SmpConstants::OPT_QUOTE_CSS_LIGHT,
+            SmpConstants::OPT_QUOTE_CSS_DARK,
+            $this->getDefaultQuoteTemplate(),
+            $this->getDefaultQuoteCss(),
+            $this->getDefaultQuoteCssDark(),
+            [
+                '{{LOGO}}' => $common['logo'],
+                '{{SITE_NAME}}' => $common['siteName'],
+                '{{SITE_URL}}' => $common['siteUrl'],
+                '{{QUOTE}}' => htmlspecialchars($rawQuote, ENT_QUOTES, 'UTF-8'),
+                '{{ATTRIBUTION}}' => $attribution,
+                '{{HASHTAGS}}' => htmlspecialchars($hashtags, ENT_QUOTES, 'UTF-8'),
+            ]
+        );
+
+        return $this->renderHtmlToImage($html, 'smp_quote');
+    }
+
+    private function generateQuoteImageGd(string $quoteText): ?string
+    {
         if (!extension_loaded('gd')) {
             return null;
         }
@@ -942,6 +1306,41 @@ body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Sego
      */
     public function generateExamImage(string $title, ?int $postId = null): ?string
     {
+        // Try HTML template rendering via wkhtmltoimage first
+        $htmlResult = $this->generateExamFromHtml($title, $postId);
+        if ($htmlResult !== null) {
+            return $htmlResult;
+        }
+
+        // Fallback to GD rendering
+        return $this->generateExamImageGd($title, $postId);
+    }
+
+    private function generateExamFromHtml(string $title, ?int $postId = null): ?string
+    {
+        $common = $this->getCommonPlaceholders();
+        $titleClean = htmlspecialchars(html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+
+        $html = $this->buildFromTemplate(
+            SmpConstants::OPT_EXAM_TEMPLATE,
+            SmpConstants::OPT_EXAM_CSS_LIGHT,
+            SmpConstants::OPT_EXAM_CSS_DARK,
+            $this->getDefaultExamTemplate(),
+            $this->getDefaultExamCss(),
+            $this->getDefaultExamCssDark(),
+            [
+                '{{LOGO}}' => $common['logo'],
+                '{{SITE_NAME}}' => $common['siteName'],
+                '{{SITE_URL}}' => $common['siteUrl'],
+                '{{TITLE}}' => $titleClean,
+            ]
+        );
+
+        return $this->renderHtmlToImage($html, 'smp_exam_' . ($postId ?: uniqid()));
+    }
+
+    private function generateExamImageGd(string $title, ?int $postId = null): ?string
+    {
         if (!extension_loaded('gd')) {
             return null;
         }
@@ -1064,6 +1463,41 @@ body{width:' . $w . 'px;height:' . $h . 'px;background:#ffffff;font-family:"Sego
      * @return string|null Public URL of the generated image, or null on failure
      */
     public function generateJobImage(string $title, ?int $postId = null): ?string
+    {
+        // Try HTML template rendering via wkhtmltoimage first
+        $htmlResult = $this->generateJobFromHtml($title, $postId);
+        if ($htmlResult !== null) {
+            return $htmlResult;
+        }
+
+        // Fallback to GD rendering
+        return $this->generateJobImageGd($title, $postId);
+    }
+
+    private function generateJobFromHtml(string $title, ?int $postId = null): ?string
+    {
+        $common = $this->getCommonPlaceholders();
+        $titleClean = htmlspecialchars(html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+
+        $html = $this->buildFromTemplate(
+            SmpConstants::OPT_JOB_TEMPLATE,
+            SmpConstants::OPT_JOB_CSS_LIGHT,
+            SmpConstants::OPT_JOB_CSS_DARK,
+            $this->getDefaultJobTemplate(),
+            $this->getDefaultJobCss(),
+            $this->getDefaultJobCssDark(),
+            [
+                '{{LOGO}}' => $common['logo'],
+                '{{SITE_NAME}}' => $common['siteName'],
+                '{{SITE_URL}}' => $common['siteUrl'],
+                '{{TITLE}}' => $titleClean,
+            ]
+        );
+
+        return $this->renderHtmlToImage($html, 'smp_job_' . ($postId ?: uniqid()));
+    }
+
+    private function generateJobImageGd(string $title, ?int $postId = null): ?string
     {
         if (!extension_loaded('gd')) {
             return null;

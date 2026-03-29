@@ -27,6 +27,7 @@ class SmpAdmin
             SmpConstants::OPT_IMAGE_TEXT_COLOR => '#333333',
             SmpConstants::OPT_IMAGE_FONT_SIZE => '28',
             SmpConstants::OPT_IMAGE_LOGO_URL => '',
+            SmpConstants::OPT_IMAGE_STYLE => 'light',
             SmpConstants::OPT_QOTD_ENABLED => '0',
             SmpConstants::OPT_QOTD_HOUR => '9',
             SmpConstants::OPT_QOTD_EXCLUDE_TAGS => '',
@@ -768,6 +769,366 @@ class SmpAdmin
             'value' => qa_opt(SmpConstants::OPT_IMAGE_LOGO_URL),
             'tags' => 'NAME="smp_image_logo_url" SIZE="80"',
             'note' => 'Absolute server path to logo image (e.g. /var/www/html/images/logo.png)',
+        ];
+
+        $fields['image_site_name'] = [
+            'label' => 'Site Name (on image):',
+            'type' => 'text',
+            'value' => qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME) ?: '',
+            'tags' => 'NAME="smp_image_site_name" SIZE="40"',
+            'note' => 'Custom name shown on QOTD images. Leave blank to use the Q2A site title.',
+        ];
+
+        $currentStyle = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
+        $showLight = ($currentStyle === 'light') ? 'block' : 'none';
+        $showDark = ($currentStyle === 'dark') ? 'block' : 'none';
+        $onchange = 'var v=this.value;'
+            . '[&#39;smp-pv-light&#39;,&#39;smp-pv-quote-light&#39;,&#39;smp-pv-exam-light&#39;,&#39;smp-pv-job-light&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;light&#39;?&#39;block&#39;:&#39;none&#39;});'
+            . '[&#39;smp-pv-dark&#39;,&#39;smp-pv-quote-dark&#39;,&#39;smp-pv-exam-dark&#39;,&#39;smp-pv-job-dark&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;dark&#39;?&#39;block&#39;:&#39;none&#39;});';
+
+        $fields['image_style'] = [
+            'label' => 'Image Style:',
+            'type' => 'select',
+            'options' => ['light' => 'Light (white background, blue accents)', 'dark' => 'Dark (dark background, vibrant accents)'],
+            'value' => $currentStyle,
+            'tags' => 'NAME="smp_image_style" id="smp_image_style" onchange="' . $onchange . '"',
+            'note' => 'Select the visual theme for all generated images (QOTD, Quote, Exam, Job)',
+        ];
+
+        // Build logo tag for preview
+        $logoPath = qa_opt(SmpConstants::OPT_IMAGE_LOGO_URL);
+        $logoPreviewTag = '';
+        if ($logoPath && file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $logoMime = mime_content_type($logoPath) ?: 'image/png';
+            $logoPreviewTag = '<img src="data:' . $logoMime . ';base64,' . $logoData . '" style="height:18px;width:auto;display:block;margin:0 auto 4px" alt="">';
+        }
+
+        // Site name for preview
+        $pvSiteName = htmlspecialchars(qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME) ?: qa_opt('site_title') ?: qa_opt('site_name') ?: 'Site Name', ENT_QUOTES, 'UTF-8');
+        $pvSiteUrl = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
+
+        $boxStyle = 'margin:8px 0;border-radius:8px;overflow:hidden;width:320px;height:320px;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15);';
+        $pvBoxStyle = 'margin:8px 0;border-radius:8px;overflow:hidden;width:220px;height:220px;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;';
+
+        $lightPreview = '<div id="smp-pv-light" style="' . $boxStyle . 'display:' . $showLight . '">'
+            . '<div style="width:100%;height:100%;background:#ffffff;position:relative;overflow:hidden;padding:16px">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)"></div>'
+            . '<div style="text-align:center;margin:6px 0 4px">' . $logoPreviewTag . '</div>'
+            . '<div style="text-align:center;margin:0 0 6px"><span style="background:#2563EB;color:#fff;font-size:7px;font-weight:700;letter-spacing:1.5px;padding:3px 10px;border-radius:8px;display:inline-block">QUESTION OF THE DAY</span></div>'
+            . '<div style="background:#f8fafc;border-radius:6px;padding:8px 10px;border-left:2px solid #2563EB;margin-bottom:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
+            . '<p style="font-size:11px;line-height:1.45;color:#1a1a2e;margin:0">The time complexity of building a heap of n elements is?</p>'
+            . '<code style="display:inline-block;background:#eef2ff;color:#3730a3;font-size:9px;padding:1px 4px;border-radius:3px;margin-top:3px">O(n log n)</code></div>'
+            . '<div style="background:#f1f5f9;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #e2e8f0;display:flex;align-items:center;gap:6px">'
+            . '<span style="width:16px;height:16px;border-radius:50%;background:#2563EB;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">A</span>'
+            . '<span style="font-size:10px;color:#334155">O(n)</span></div>'
+            . '<div style="background:#f1f5f9;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #e2e8f0;display:flex;align-items:center;gap:6px">'
+            . '<span style="width:16px;height:16px;border-radius:50%;background:#2563EB;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">B</span>'
+            . '<span style="font-size:10px;color:#334155">O(n log n)</span></div>'
+            . '<div style="position:absolute;bottom:8px;left:14px;right:14px;border-top:1px solid #e2e8f0;padding-top:5px;display:flex;align-items:center;justify-content:space-between">'
+            . '<span style="font-size:7px;font-weight:700;color:#64748b">' . $pvSiteName . '</span>'
+            . '<span style="font-size:6px;color:#94a3b8">' . $pvSiteUrl . '</span></div>'
+            . '</div></div>';
+
+        $darkPreview = '<div id="smp-pv-dark" style="' . $boxStyle . 'display:' . $showDark . '">'
+            . '<div style="width:100%;height:100%;background:#0f172a;position:relative;overflow:hidden;padding:16px">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)"></div>'
+            . '<div style="text-align:center;margin:6px 0 4px">' . ($logoPreviewTag ? str_replace('margin:0 auto 4px', 'margin:0 auto 4px;filter:invert(1) brightness(1.2)', $logoPreviewTag) : '') . '</div>'
+            . '<div style="text-align:center;margin:0 0 6px"><span style="background:#6366f1;color:#fff;font-size:7px;font-weight:700;letter-spacing:1.5px;padding:3px 10px;border-radius:8px;display:inline-block">QUESTION OF THE DAY</span></div>'
+            . '<div style="background:#1e293b;border-radius:6px;padding:8px 10px;border-left:2px solid #6366f1;margin-bottom:6px;box-shadow:0 1px 6px rgba(0,0,0,.3)">'
+            . '<p style="font-size:11px;line-height:1.45;color:#e2e8f0;margin:0">The time complexity of building a heap of n elements is?</p>'
+            . '<code style="display:inline-block;background:#334155;color:#a5b4fc;font-size:9px;padding:1px 4px;border-radius:3px;margin-top:3px">O(n log n)</code></div>'
+            . '<div style="background:#1e293b;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #334155;display:flex;align-items:center;gap:6px">'
+            . '<span style="width:16px;height:16px;border-radius:50%;background:#6366f1;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">A</span>'
+            . '<span style="font-size:10px;color:#cbd5e1">O(n)</span></div>'
+            . '<div style="background:#1e293b;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #334155;display:flex;align-items:center;gap:6px">'
+            . '<span style="width:16px;height:16px;border-radius:50%;background:#6366f1;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">B</span>'
+            . '<span style="font-size:10px;color:#cbd5e1">O(n log n)</span></div>'
+            . '<div style="position:absolute;bottom:8px;left:14px;right:14px;border-top:1px solid #334155;padding-top:5px;display:flex;align-items:center;justify-content:space-between">'
+            . '<span style="font-size:7px;font-weight:700;color:#94a3b8">' . $pvSiteName . '</span>'
+            . '<span style="font-size:6px;color:#64748b">' . $pvSiteUrl . '</span></div>'
+            . '</div></div>';
+
+        $fields['image_style_preview'] = [
+            'type' => 'static',
+            'label' => 'Style Preview:',
+            'value' => $lightPreview . $darkPreview,
+        ];
+
+        // Editable CSS for light theme
+        $defaultCssLight = self::getDefaultCssLight();
+        $currentCssLight = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+        $cssLightValue = !empty(trim($currentCssLight ?? '')) ? $currentCssLight : $defaultCssLight;
+        $fields['image_css_light'] = [
+            'label' => 'Light Theme CSS:',
+            'type' => 'text',
+            'rows' => 14,
+            'value' => htmlspecialchars($cssLightValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_image_css_light" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="14"',
+            'note' => 'CSS for the light style. Use <code>{{WIDTH}}</code> and <code>{{HEIGHT}}</code> for image dimensions. Leave empty to use default.',
+        ];
+
+        // Editable CSS for dark theme
+        $defaultCssDark = self::getDefaultCssDark();
+        $currentCssDark = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+        $cssDarkValue = !empty(trim($currentCssDark ?? '')) ? $currentCssDark : $defaultCssDark;
+        $fields['image_css_dark'] = [
+            'label' => 'Dark Theme CSS:',
+            'type' => 'text',
+            'rows' => 14,
+            'value' => htmlspecialchars($cssDarkValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_image_css_dark" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="14"',
+            'note' => 'CSS for the dark style. Use <code>{{WIDTH}}</code> and <code>{{HEIGHT}}</code> for image dimensions. Leave empty to use default.',
+        ];
+
+        $defaultTemplate = self::getDefaultTemplateHtml();
+        $currentTemplate = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        $templateValue = !empty(trim($currentTemplate ?? '')) ? $currentTemplate : $defaultTemplate;
+        $fields['image_template'] = [
+            'label' => 'QOTD HTML Template:',
+            'type' => 'text',
+            'rows' => 18,
+            'value' => htmlspecialchars($templateValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_image_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="18"',
+            'note' => 'Placeholders: <code>{{KATEX_CSS}}</code> <code>{{CSS}}</code> <code>{{SITE_NAME}}</code> <code>{{LOGO}}</code> <code>{{QUESTION}}</code> <code>{{OPTIONS}}</code> <code>{{SITE_URL}}</code>. Leave empty to use default template.',
+        ];
+
+        // ============ QUOTE OF THE DAY ============
+        $fields['section_quote_template'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:20px 0 8px;color:#9b59b6;border-bottom:1px solid #9b59b6;padding-bottom:4px;">Quote of the Day Template</h3>',
+        ];
+
+        $logoPvInverted = $logoPreviewTag ? str_replace('margin:0 auto 4px', 'margin:0 auto 4px;filter:invert(1) brightness(1.5)', $logoPreviewTag) : '';
+        $logoPvDarkSmall = str_replace('height:18px', 'height:14px', $logoPvInverted);
+        $logoPvLightSmall = str_replace('height:18px', 'height:14px', $logoPreviewTag);
+
+        $showQuoteLight = ($currentStyle === 'light') ? 'block' : 'none';
+        $showQuoteDark = ($currentStyle === 'dark') ? 'block' : 'none';
+
+        $quotePreviewLight = '<div id="smp-pv-quote-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#2a1152,#0d1b3e)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#c792ea,#89b4fa,#a78bfa)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
+            . '<div style="text-align:center;margin:2px 0 4px"><span style="background:rgba(199,146,234,0.3);color:#c792ea;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(199,146,234,0.4)">QUOTE OF THE DAY</span></div>'
+            . '<div style="text-align:center;font-family:Georgia,serif;font-size:24px;color:#c792ea;line-height:1">&ldquo;</div>'
+            . '<div style="text-align:center;padding:0 14px;font-family:Georgia,serif;font-size:9px;line-height:1.5;color:#f0f0ff">Success is not final, failure is not fatal: it is the courage to continue that counts.</div>'
+            . '<div style="text-align:center;font-family:Georgia,serif;font-size:14px;color:#c792ea;line-height:1">&rdquo;</div>'
+            . '<div style="text-align:center;font-size:6px;color:rgba(200,200,230,0.7);margin-top:2px">&mdash; Winston Churchill</div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $quotePreviewDark = '<div id="smp-pv-quote-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#1a0a2e,#0a1628)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#a78bfa,#6366f1,#818cf8)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
+            . '<div style="text-align:center;margin:2px 0 4px"><span style="background:rgba(139,92,246,0.3);color:#a78bfa;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(139,92,246,0.4)">QUOTE OF THE DAY</span></div>'
+            . '<div style="text-align:center;font-family:Georgia,serif;font-size:24px;color:#a78bfa;line-height:1">&ldquo;</div>'
+            . '<div style="text-align:center;padding:0 14px;font-family:Georgia,serif;font-size:9px;line-height:1.5;color:#e2e8f0">Success is not final, failure is not fatal: it is the courage to continue that counts.</div>'
+            . '<div style="text-align:center;font-family:Georgia,serif;font-size:14px;color:#a78bfa;line-height:1">&rdquo;</div>'
+            . '<div style="text-align:center;font-size:6px;color:rgba(148,163,184,0.7);margin-top:2px">&mdash; Winston Churchill</div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $quoteToggle = '<div style="margin:4px 0 6px">'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-quote-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-quote-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-quote-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-quote-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
+            '</div>';
+
+        $fields['quote_preview'] = [
+            'type' => 'static',
+            'label' => 'Quote Preview:',
+            'value' => $quoteToggle . $quotePreviewLight . $quotePreviewDark,
+        ];
+
+        $defaultQuoteCssLight = self::getDefaultQuoteCss();
+        $currentQuoteCssLight = qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
+        $quoteCssLightValue = !empty(trim($currentQuoteCssLight ?? '')) ? $currentQuoteCssLight : $defaultQuoteCssLight;
+        $fields['quote_css_light'] = [
+            'label' => 'Quote Light CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($quoteCssLightValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_quote_css_light" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Light CSS for quote images. Use <code>{{WIDTH}}</code> and <code>{{HEIGHT}}</code>. Leave empty for default.',
+        ];
+
+        $defaultQuoteCssDark = self::getDefaultQuoteCssDark();
+        $currentQuoteCssDark = qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK);
+        $quoteCssDarkValue = !empty(trim($currentQuoteCssDark ?? '')) ? $currentQuoteCssDark : $defaultQuoteCssDark;
+        $fields['quote_css_dark'] = [
+            'label' => 'Quote Dark CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($quoteCssDarkValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_quote_css_dark" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Dark CSS for quote images. Leave empty for default.',
+        ];
+
+        $defaultQuoteTemplate = self::getDefaultQuoteTemplateHtml();
+        $currentQuoteTemplate = qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE);
+        $quoteTemplateValue = !empty(trim($currentQuoteTemplate ?? '')) ? $currentQuoteTemplate : $defaultQuoteTemplate;
+        $fields['quote_template'] = [
+            'label' => 'Quote HTML Template:',
+            'type' => 'text',
+            'rows' => 12,
+            'value' => htmlspecialchars($quoteTemplateValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_quote_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="12"',
+            'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{QUOTE}}</code> <code>{{ATTRIBUTION}}</code> <code>{{HASHTAGS}}</code>',
+        ];
+
+        // ============ EXAM ============
+        $fields['section_exam_template'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:20px 0 8px;color:#00897b;border-bottom:1px solid #00897b;padding-bottom:4px;">Exam Template</h3>',
+        ];
+
+        $examPreviewLight = '<div id="smp-pv-exam-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#004d40,#0d47a1)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
+            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#00e6be">&#x270F;</div>'
+            . '<div style="text-align:center;margin:2px 0 8px"><span style="background:rgba(0,200,170,0.25);color:#fff;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(0,200,170,0.4)">NEW EXAM</span></div>'
+            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#fff">GATE CSE 2027 Mock Test Series</div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $examPreviewDark = '<div id="smp-pv-exam-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#0a2a25,#0a1832)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
+            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#2dd4bf">&#x270F;</div>'
+            . '<div style="text-align:center;margin:2px 0 8px"><span style="background:rgba(45,212,191,0.2);color:#5eead4;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(45,212,191,0.3)">NEW EXAM</span></div>'
+            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#e2e8f0">GATE CSE 2027 Mock Test Series</div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $examToggle = '<div style="margin:4px 0 6px">'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-exam-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-exam-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-exam-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-exam-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
+            '</div>';
+
+        $fields['exam_preview'] = [
+            'type' => 'static',
+            'label' => 'Exam Preview:',
+            'value' => $examToggle . $examPreviewLight . $examPreviewDark,
+        ];
+
+        $defaultExamCssLight = self::getDefaultExamCss();
+        $currentExamCssLight = qa_opt(SmpConstants::OPT_EXAM_CSS_LIGHT);
+        $examCssLightValue = !empty(trim($currentExamCssLight ?? '')) ? $currentExamCssLight : $defaultExamCssLight;
+        $fields['exam_css_light'] = [
+            'label' => 'Exam Light CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($examCssLightValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_exam_css_light" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Light CSS for exam images. Use <code>{{WIDTH}}</code> and <code>{{HEIGHT}}</code>. Leave empty for default.',
+        ];
+
+        $defaultExamCssDark = self::getDefaultExamCssDark();
+        $currentExamCssDark = qa_opt(SmpConstants::OPT_EXAM_CSS_DARK);
+        $examCssDarkValue = !empty(trim($currentExamCssDark ?? '')) ? $currentExamCssDark : $defaultExamCssDark;
+        $fields['exam_css_dark'] = [
+            'label' => 'Exam Dark CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($examCssDarkValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_exam_css_dark" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Dark CSS for exam images. Leave empty for default.',
+        ];
+
+        $defaultExamTemplate = self::getDefaultExamTemplateHtml();
+        $currentExamTemplate = qa_opt(SmpConstants::OPT_EXAM_TEMPLATE);
+        $examTemplateValue = !empty(trim($currentExamTemplate ?? '')) ? $currentExamTemplate : $defaultExamTemplate;
+        $fields['exam_template'] = [
+            'label' => 'Exam HTML Template:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($examTemplateValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_exam_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{TITLE}}</code>',
+        ];
+
+        // ============ JOB ============
+        $fields['section_job_template'] = [
+            'type' => 'static',
+            'label' => '<h3 style="margin:20px 0 8px;color:#e65100;border-bottom:1px solid #e65100;padding-bottom:4px;">Job Template</h3>',
+        ];
+
+        $jobPreviewLight = '<div id="smp-pv-job-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#880e4f,#311b92)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ffa726,#ffb74d,#ffcc02)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
+            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#ffb74d">&#x2605;</div>'
+            . '<div style="text-align:center;margin:2px 0 6px"><span style="background:rgba(255,167,38,0.25);color:#fff;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(255,167,38,0.4)">JOB OPENING</span></div>'
+            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#fff">Senior Software Engineer — Remote</div>'
+            . '<div style="text-align:center;margin-top:6px"><span style="background:#ffa726;color:#311b42;font-size:6px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:3px">APPLY NOW</span></div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $jobPreviewDark = '<div id="smp-pv-job-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#2d0a1e,#1a0e3a)">'
+            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#fb923c,#f97316,#fdba74)"></div>'
+            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
+            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#fb923c">&#x2605;</div>'
+            . '<div style="text-align:center;margin:2px 0 6px"><span style="background:rgba(251,146,60,0.2);color:#fdba74;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(251,146,60,0.3)">JOB OPENING</span></div>'
+            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#e2e8f0">Senior Software Engineer — Remote</div>'
+            . '<div style="text-align:center;margin-top:6px"><span style="background:#fb923c;color:#1a0e3a;font-size:6px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:3px">APPLY NOW</span></div>'
+            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
+            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
+            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
+            . '</div>';
+
+        $jobToggle = '<div style="margin:4px 0 6px">'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-job-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-job-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
+            '<button type="button" onclick="document.getElementById(&#39;smp-pv-job-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-job-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
+            '</div>';
+
+        $fields['job_preview'] = [
+            'type' => 'static',
+            'label' => 'Job Preview:',
+            'value' => $jobToggle . $jobPreviewLight . $jobPreviewDark,
+        ];
+
+        $defaultJobCssLight = self::getDefaultJobCss();
+        $currentJobCssLight = qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT);
+        $jobCssLightValue = !empty(trim($currentJobCssLight ?? '')) ? $currentJobCssLight : $defaultJobCssLight;
+        $fields['job_css_light'] = [
+            'label' => 'Job Light CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($jobCssLightValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_job_css_light" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Light CSS for job images. Use <code>{{WIDTH}}</code> and <code>{{HEIGHT}}</code>. Leave empty for default.',
+        ];
+
+        $defaultJobCssDark = self::getDefaultJobCssDark();
+        $currentJobCssDark = qa_opt(SmpConstants::OPT_JOB_CSS_DARK);
+        $jobCssDarkValue = !empty(trim($currentJobCssDark ?? '')) ? $currentJobCssDark : $defaultJobCssDark;
+        $fields['job_css_dark'] = [
+            'label' => 'Job Dark CSS:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($jobCssDarkValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_job_css_dark" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Dark CSS for job images. Leave empty for default.',
+        ];
+
+        $defaultJobTemplate = self::getDefaultJobTemplateHtml();
+        $currentJobTemplate = qa_opt(SmpConstants::OPT_JOB_TEMPLATE);
+        $jobTemplateValue = !empty(trim($currentJobTemplate ?? '')) ? $currentJobTemplate : $defaultJobTemplate;
+        $fields['job_template'] = [
+            'label' => 'Job HTML Template:',
+            'type' => 'text',
+            'rows' => 10,
+            'value' => htmlspecialchars($jobTemplateValue, ENT_QUOTES, 'UTF-8'),
+            'tags' => 'NAME="smp_job_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
+            'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{TITLE}}</code>',
         ];
 
         $fields['btn_save_image_settings'] = [
@@ -1901,6 +2262,46 @@ class SmpAdmin
         qa_opt(SmpConstants::OPT_IMAGE_FONT_SIZE, $fontSize > 0 ? $fontSize : 28);
 
         qa_opt(SmpConstants::OPT_IMAGE_LOGO_URL, qa_post_text('smp_image_logo_url'));
+
+        qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME, trim(qa_post_text('smp_image_site_name') ?? ''));
+
+        $style = qa_post_text('smp_image_style');
+        if (in_array($style, ['light', 'dark'])) {
+            qa_opt(SmpConstants::OPT_IMAGE_STYLE, $style);
+        }
+
+        $template = qa_post_text('smp_image_template') ?? '';
+        qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE, trim($template));
+
+        $cssLight = qa_post_text('smp_image_css_light') ?? '';
+        qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT, trim($cssLight));
+
+        $cssDark = qa_post_text('smp_image_css_dark') ?? '';
+        qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK, trim($cssDark));
+
+        // Quote template
+        $quoteCssLight = qa_post_text('smp_quote_css_light') ?? '';
+        qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT, trim($quoteCssLight));
+        $quoteCssDark = qa_post_text('smp_quote_css_dark') ?? '';
+        qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK, trim($quoteCssDark));
+        $quoteTemplate = qa_post_text('smp_quote_template') ?? '';
+        qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE, trim($quoteTemplate));
+
+        // Exam template
+        $examCssLight = qa_post_text('smp_exam_css_light') ?? '';
+        qa_opt(SmpConstants::OPT_EXAM_CSS_LIGHT, trim($examCssLight));
+        $examCssDark = qa_post_text('smp_exam_css_dark') ?? '';
+        qa_opt(SmpConstants::OPT_EXAM_CSS_DARK, trim($examCssDark));
+        $examTemplate = qa_post_text('smp_exam_template') ?? '';
+        qa_opt(SmpConstants::OPT_EXAM_TEMPLATE, trim($examTemplate));
+
+        // Job template
+        $jobCssLight = qa_post_text('smp_job_css_light') ?? '';
+        qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT, trim($jobCssLight));
+        $jobCssDark = qa_post_text('smp_job_css_dark') ?? '';
+        qa_opt(SmpConstants::OPT_JOB_CSS_DARK, trim($jobCssDark));
+        $jobTemplate = qa_post_text('smp_job_template') ?? '';
+        qa_opt(SmpConstants::OPT_JOB_TEMPLATE, trim($jobTemplate));
     }
 
     private function saveDailySettings(): void
@@ -2176,5 +2577,255 @@ class SmpAdmin
 
         $html .= '</div>';
         return $html;
+    }
+
+    private static function getDefaultTemplateHtml(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<link rel="stylesheet" href="{{KATEX_CSS}}">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="watermark">{{SITE_NAME}}</div>
+<div class="header">{{LOGO}}</div>
+<div class="badge"><span>QUESTION OF THE DAY</span></div>
+<div class="content">
+<div class="question-card">{{QUESTION}}</div>
+<div class="options">{{OPTIONS}}</div>
+</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+</body></html>';
+    }
+
+    private static function getDefaultCssLight(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#ffffff;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#1a1a2e;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:132px;font-weight:900;color:rgba(0,0,0,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.header{text-align:center;padding:20px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
+.badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
+.badge span{display:inline-block;background:#2563EB;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.content{padding:0 50px 72px;position:relative;z-index:1}
+.question-card{background:#f8fafc;border-radius:14px;padding:24px 30px;border-left:5px solid #2563EB;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.question-card p,.question-card{font-size:36px;line-height:1.5;color:#1a1a2e}
+.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:34px;line-height:1.45;color:#334155}
+.question-card ol li,.question-card ul li{margin-bottom:5px}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#eef2ff;border-radius:6px;padding:2px 8px;font-size:31px;color:#3730a3}
+.question-card pre{display:block;padding:12px 16px;margin:10px 0;overflow-x:hidden;white-space:pre-wrap}
+.question-card table{border-collapse:collapse;margin:10px 0;font-size:31px}
+.question-card td,.question-card th{border:1px solid #e2e8f0;padding:8px 14px}
+.question-card img{max-width:100%;border-radius:8px}
+.options{margin:0}
+.option{background:#f1f5f9;border-radius:12px;padding:14px 22px;margin-bottom:10px;display:table;width:100%;border:1px solid #e2e8f0}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#2563EB;text-align:center;vertical-align:middle;font-weight:700;font-size:26px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:32px;line-height:1.4;color:#334155}
+.branding{position:absolute;bottom:20px;left:50px;right:50px;border-top:2px solid #e2e8f0;padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:24px;font-weight:700;color:#64748b}
+.branding .url{font-size:20px;color:#94a3b8}
+.katex{font-size:1.05em!important;color:#1a1a2e!important}
+.katex-display{margin:0.2em 0!important}';
+    }
+
+    private static function getDefaultCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#e2e8f0;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)}
+.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-30deg);font-size:132px;font-weight:900;color:rgba(255,255,255,0.03);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:4px}
+.header{text-align:center;padding:20px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.2)}
+.badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
+.badge span{display:inline-block;background:#6366f1;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.content{padding:0 50px 72px;position:relative;z-index:1}
+.question-card{background:#1e293b;border-radius:14px;padding:24px 30px;border-left:5px solid #6366f1;margin-bottom:16px;box-shadow:0 2px 16px rgba(0,0,0,0.3)}
+.question-card p,.question-card{font-size:36px;line-height:1.5;color:#e2e8f0}
+.question-card ol,.question-card ul{margin:10px 0 10px 28px;font-size:34px;line-height:1.45;color:#cbd5e1}
+.question-card ol li,.question-card ul li{margin-bottom:5px}
+.question-card pre,.question-card code{font-family:"DejaVu Sans Mono","Courier New",monospace;background:#334155;border-radius:6px;padding:2px 8px;font-size:31px;color:#a5b4fc}
+.question-card pre{display:block;padding:12px 16px;margin:10px 0;overflow-x:hidden;white-space:pre-wrap}
+.question-card table{border-collapse:collapse;margin:10px 0;font-size:31px}
+.question-card td,.question-card th{border:1px solid #334155;padding:8px 14px;color:#cbd5e1}
+.question-card img{max-width:100%;border-radius:8px}
+.options{margin:0}
+.option{background:#1e293b;border-radius:12px;padding:14px 22px;margin-bottom:10px;display:table;width:100%;border:1px solid #334155}
+.option-label{display:table-cell;width:44px;height:44px;min-width:44px;border-radius:50%;background:#6366f1;text-align:center;vertical-align:middle;font-weight:700;font-size:26px;color:#fff}
+.option-text{display:table-cell;vertical-align:middle;padding-left:20px;font-size:32px;line-height:1.4;color:#cbd5e1}
+.branding{position:absolute;bottom:20px;left:50px;right:50px;border-top:2px solid #334155;padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:24px;font-weight:700;color:#94a3b8}
+.branding .url{font-size:20px;color:#64748b}
+.katex{font-size:1.05em!important;color:#e2e8f0!important}
+.katex-display{margin:0.2em 0!important}';
+    }
+
+    // ======================== Quote defaults ========================
+
+    private static function getDefaultQuoteCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2a1152 0%,#0d1b3e 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#c792ea,#89b4fa,#a78bfa)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.badge{text-align:center;margin:10px 0 20px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(199,146,234,0.3);color:#c792ea;font-size:18px;font-weight:700;letter-spacing:3px;padding:6px 24px;border-radius:20px;border:1px solid rgba(199,146,234,0.4)}
+.quote-mark{text-align:center;font-family:Georgia,"DejaVu Serif",serif;color:#c792ea;position:relative;z-index:1;line-height:1}
+.quote-mark.open{font-size:120px;margin-bottom:-20px}
+.quote-mark.close{font-size:60px;margin-top:-10px}
+.quote-body{padding:0 80px;text-align:center;font-family:Georgia,"DejaVu Serif",serif;font-size:36px;line-height:1.6;color:#f0f0ff;position:relative;z-index:1}
+.attribution{text-align:center;padding:20px 80px 0;font-size:24px;color:rgba(200,200,230,0.7);position:relative;z-index:1}
+.branding{position:absolute;bottom:50px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.1);padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}
+.hashtags{position:absolute;bottom:18px;left:50px;right:50px;text-align:center;font-size:14px;color:rgba(199,146,234,0.5)}';
+    }
+
+    private static function getDefaultQuoteCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#1a0a2e 0%,#0a1628 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:5px;background:linear-gradient(90deg,#a78bfa,#6366f1,#818cf8)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.badge{text-align:center;margin:10px 0 20px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(139,92,246,0.3);color:#a78bfa;font-size:18px;font-weight:700;letter-spacing:3px;padding:6px 24px;border-radius:20px;border:1px solid rgba(139,92,246,0.4)}
+.quote-mark{text-align:center;font-family:Georgia,"DejaVu Serif",serif;color:#a78bfa;position:relative;z-index:1;line-height:1}
+.quote-mark.open{font-size:120px;margin-bottom:-20px}
+.quote-mark.close{font-size:60px;margin-top:-10px}
+.quote-body{padding:0 80px;text-align:center;font-family:Georgia,"DejaVu Serif",serif;font-size:36px;line-height:1.6;color:#e2e8f0;position:relative;z-index:1}
+.attribution{text-align:center;padding:20px 80px 0;font-size:24px;color:rgba(148,163,184,0.7);position:relative;z-index:1}
+.branding{position:absolute;bottom:50px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}
+.hashtags{position:absolute;bottom:18px;left:50px;right:50px;text-align:center;font-size:14px;color:rgba(139,92,246,0.4)}';
+    }
+
+    private static function getDefaultQuoteTemplateHtml(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="badge"><span>QUOTE OF THE DAY</span></div>
+<div class="quote-mark open">&ldquo;</div>
+<div class="quote-body">{{QUOTE}}</div>
+<div class="quote-mark close">&rdquo;</div>
+<div class="attribution">{{ATTRIBUTION}}</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+<div class="hashtags">{{HASHTAGS}}</div>
+</body></html>';
+    }
+
+    // ======================== Exam defaults ========================
+
+    private static function getDefaultExamCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#004d40 0%,#0d47a1 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#00e6be;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(0,200,170,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(0,200,170,0.4)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+    }
+
+    private static function getDefaultExamCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#0a2a25 0%,#0a1832 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#2dd4bf;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(45,212,191,0.2);color:#5eead4;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(45,212,191,0.3)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
+    }
+
+    private static function getDefaultExamTemplateHtml(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="icon">&#x270F;</div>
+<div class="badge"><span>NEW EXAM</span></div>
+<div class="title">{{TITLE}}</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+</body></html>';
+    }
+
+    // ======================== Job defaults ========================
+
+    private static function getDefaultJobCss(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#880e4f 0%,#311b92 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#ffa726,#ffb74d,#ffcc02)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#ffb74d;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(255,167,38,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(255,167,38,0.4)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
+.cta{text-align:center;margin:40px auto 0;background:#ffa726;color:#311b42;font-size:22px;font-weight:700;letter-spacing:2px;padding:12px 40px;border-radius:8px;display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+    }
+
+    private static function getDefaultJobCssDark(): string
+    {
+        return '*{margin:0;padding:0;box-sizing:border-box}
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d0a1e 0%,#1a0e3a 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#fb923c,#f97316,#fdba74)}
+.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
+.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
+.icon{text-align:center;font-size:80px;color:#fb923c;margin:10px 0;position:relative;z-index:1}
+.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
+.badge span{display:inline-block;background:rgba(251,146,60,0.2);color:#fdba74;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(251,146,60,0.3)}
+.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
+.cta{text-align:center;margin:40px auto 0;background:#fb923c;color:#1a0e3a;font-size:22px;font-weight:700;letter-spacing:2px;padding:12px 40px;border-radius:8px;display:inline-block;position:relative;left:50%;transform:translateX(-50%)}
+.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
+.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
+.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
+    }
+
+    private static function getDefaultJobTemplateHtml(): string
+    {
+        return '<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>{{CSS}}</style></head><body>
+<div class="accent-bar"></div>
+<div class="header">{{LOGO}}</div>
+<div class="icon">&#x2605;</div>
+<div class="badge"><span>JOB OPENING</span></div>
+<div class="title">{{TITLE}}</div>
+<div class="cta">APPLY NOW</div>
+<div class="branding">
+<span class="site">{{SITE_NAME}}</span>
+<span class="url">{{SITE_URL}}</span>
+</div>
+</body></html>';
     }
 }
