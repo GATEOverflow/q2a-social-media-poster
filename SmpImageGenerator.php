@@ -82,6 +82,9 @@ class SmpImageGenerator
         // Pre-render math server-side via Node.js KaTeX
         $html = $this->renderMathServerSide($html);
 
+        // Add -webkit- gradient prefixes for wkhtmltoimage (older WebKit)
+        $html = $this->addWebkitGradients($html);
+
         // Write to temp file
         $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
         $tempPng = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.png';
@@ -313,6 +316,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe
     {
         $w = $this->width;
         $h = $this->height;
+        $html = $this->addWebkitGradients($html);
         $tempHtml = tempnam(sys_get_temp_dir(), 'smp_' . $prefix . '_') . '.html';
         $tempPng = tempnam(sys_get_temp_dir(), 'smp_' . $prefix . '_') . '.png';
         file_put_contents($tempHtml, $html);
@@ -1701,6 +1705,21 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
 
         $siteUrl = rtrim(qa_opt('site_url'), '/');
         return $siteUrl . '/qa-uploads/smp-images/' . $filename;
+    }
+
+    /**
+     * Add -webkit- prefixed gradient declarations for wkhtmltoimage (older WebKit engine).
+     * Duplicates each background:linear-gradient(...) as background:-webkit-linear-gradient(...) before it.
+     */
+    private function addWebkitGradients(string $html): string
+    {
+        return preg_replace_callback(
+            '/(background\s*:\s*)(linear-gradient\([^)]+\))/i',
+            function ($m) {
+                return 'background:-webkit-' . $m[2] . ';' . $m[1] . $m[2];
+            },
+            $html
+        );
     }
 
     /**

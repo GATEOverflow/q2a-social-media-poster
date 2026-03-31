@@ -780,11 +780,11 @@ class SmpAdmin
         ];
 
         $currentStyle = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
-        $showLight = ($currentStyle === 'light') ? 'block' : 'none';
-        $showDark = ($currentStyle === 'dark') ? 'block' : 'none';
+        $showLight = ($currentStyle === 'light') ? 'inline-block' : 'none';
+        $showDark = ($currentStyle === 'dark') ? 'inline-block' : 'none';
         $onchange = 'var v=this.value;'
-            . '[&#39;smp-pv-light&#39;,&#39;smp-pv-quote-light&#39;,&#39;smp-pv-exam-light&#39;,&#39;smp-pv-job-light&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;light&#39;?&#39;block&#39;:&#39;none&#39;});'
-            . '[&#39;smp-pv-dark&#39;,&#39;smp-pv-quote-dark&#39;,&#39;smp-pv-exam-dark&#39;,&#39;smp-pv-job-dark&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;dark&#39;?&#39;block&#39;:&#39;none&#39;});';
+            . '[&#39;smp-pv-light&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;light&#39;?&#39;inline-block&#39;:&#39;none&#39;});'
+            . '[&#39;smp-pv-dark&#39;].forEach(function(id){var e=document.getElementById(id);if(e)e.style.display=v===&#39;dark&#39;?&#39;inline-block&#39;:&#39;none&#39;});';
 
         $fields['image_style'] = [
             'label' => 'Image Style:',
@@ -795,59 +795,41 @@ class SmpAdmin
             'note' => 'Select the visual theme for all generated images (QOTD, Quote, Exam, Job)',
         ];
 
-        // Build logo tag for preview
+        // Build logo path and site info for previews
         $logoPath = qa_opt(SmpConstants::OPT_IMAGE_LOGO_URL);
-        $logoPreviewTag = '';
-        if ($logoPath && file_exists($logoPath)) {
-            $logoData = base64_encode(file_get_contents($logoPath));
-            $logoMime = mime_content_type($logoPath) ?: 'image/png';
-            $logoPreviewTag = '<img src="data:' . $logoMime . ';base64,' . $logoData . '" style="height:18px;width:auto;display:block;margin:0 auto 4px" alt="">';
-        }
 
         // Site name for preview
         $pvSiteName = htmlspecialchars(qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME) ?: qa_opt('site_title') ?: qa_opt('site_name') ?: 'Site Name', ENT_QUOTES, 'UTF-8');
         $pvSiteUrl = htmlspecialchars(parse_url(qa_opt('site_url') ?: '', PHP_URL_HOST) ?: '', ENT_QUOTES, 'UTF-8');
 
-        $boxStyle = 'margin:8px 0;border-radius:8px;overflow:hidden;width:320px;height:320px;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15);';
-        $pvBoxStyle = 'margin:8px 0;border-radius:8px;overflow:hidden;width:220px;height:220px;font-family:Segoe UI,Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,.15);position:relative;';
+        // Build iframe-based previews using actual CSS and templates
+        $logoFullTag = '';
+        if ($logoPath && file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $logoMime = mime_content_type($logoPath) ?: 'image/png';
+            $logoFullTag = '<img class="logo" src="data:' . $logoMime . ';base64,' . $logoData . '" alt="">';
+        }
 
-        $lightPreview = '<div id="smp-pv-light" style="' . $boxStyle . 'display:' . $showLight . '">'
-            . '<div style="width:100%;height:100%;background:#ffffff;position:relative;overflow:hidden;padding:16px">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2563EB,#3B82F6,#60A5FA)"></div>'
-            . '<div style="text-align:center;margin:6px 0 4px">' . $logoPreviewTag . '</div>'
-            . '<div style="text-align:center;margin:0 0 6px"><span style="background:#2563EB;color:#fff;font-size:7px;font-weight:700;letter-spacing:1.5px;padding:3px 10px;border-radius:8px;display:inline-block">QUESTION OF THE DAY</span></div>'
-            . '<div style="background:#f8fafc;border-radius:6px;padding:8px 10px;border-left:2px solid #2563EB;margin-bottom:6px;box-shadow:0 1px 4px rgba(0,0,0,.06)">'
-            . '<p style="font-size:11px;line-height:1.45;color:#1a1a2e;margin:0">The time complexity of building a heap of n elements is?</p>'
-            . '<code style="display:inline-block;background:#eef2ff;color:#3730a3;font-size:9px;padding:1px 4px;border-radius:3px;margin-top:3px">O(n log n)</code></div>'
-            . '<div style="background:#f1f5f9;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #e2e8f0;display:flex;align-items:center;gap:6px">'
-            . '<span style="width:16px;height:16px;border-radius:50%;background:#2563EB;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">A</span>'
-            . '<span style="font-size:10px;color:#334155">O(n)</span></div>'
-            . '<div style="background:#f1f5f9;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #e2e8f0;display:flex;align-items:center;gap:6px">'
-            . '<span style="width:16px;height:16px;border-radius:50%;background:#2563EB;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">B</span>'
-            . '<span style="font-size:10px;color:#334155">O(n log n)</span></div>'
-            . '<div style="position:absolute;bottom:8px;left:14px;right:14px;border-top:1px solid #e2e8f0;padding-top:5px;display:flex;align-items:center;justify-content:space-between">'
-            . '<span style="font-size:7px;font-weight:700;color:#64748b">' . $pvSiteName . '</span>'
-            . '<span style="font-size:6px;color:#94a3b8">' . $pvSiteUrl . '</span></div>'
-            . '</div></div>';
+        $sampleQuestion = '<p>The time complexity of building a heap of n elements is?</p>';
+        $sampleOptions = '<div class="option"><div class="option-label">A</div><div class="option-text">O(n)</div></div>'
+            . '<div class="option"><div class="option-label">B</div><div class="option-text">O(n log n)</div></div>'
+            . '<div class="option"><div class="option-label">C</div><div class="option-text">O(n&sup2;)</div></div>'
+            . '<div class="option"><div class="option-label">D</div><div class="option-text">O(log n)</div></div>';
 
-        $darkPreview = '<div id="smp-pv-dark" style="' . $boxStyle . 'display:' . $showDark . '">'
-            . '<div style="width:100%;height:100%;background:#0f172a;position:relative;overflow:hidden;padding:16px">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa)"></div>'
-            . '<div style="text-align:center;margin:6px 0 4px">' . ($logoPreviewTag ? str_replace('margin:0 auto 4px', 'margin:0 auto 4px;filter:invert(1) brightness(1.2)', $logoPreviewTag) : '') . '</div>'
-            . '<div style="text-align:center;margin:0 0 6px"><span style="background:#6366f1;color:#fff;font-size:7px;font-weight:700;letter-spacing:1.5px;padding:3px 10px;border-radius:8px;display:inline-block">QUESTION OF THE DAY</span></div>'
-            . '<div style="background:#1e293b;border-radius:6px;padding:8px 10px;border-left:2px solid #6366f1;margin-bottom:6px;box-shadow:0 1px 6px rgba(0,0,0,.3)">'
-            . '<p style="font-size:11px;line-height:1.45;color:#e2e8f0;margin:0">The time complexity of building a heap of n elements is?</p>'
-            . '<code style="display:inline-block;background:#334155;color:#a5b4fc;font-size:9px;padding:1px 4px;border-radius:3px;margin-top:3px">O(n log n)</code></div>'
-            . '<div style="background:#1e293b;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #334155;display:flex;align-items:center;gap:6px">'
-            . '<span style="width:16px;height:16px;border-radius:50%;background:#6366f1;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">A</span>'
-            . '<span style="font-size:10px;color:#cbd5e1">O(n)</span></div>'
-            . '<div style="background:#1e293b;border-radius:5px;padding:5px 8px;margin-bottom:3px;border:1px solid #334155;display:flex;align-items:center;gap:6px">'
-            . '<span style="width:16px;height:16px;border-radius:50%;background:#6366f1;color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center">B</span>'
-            . '<span style="font-size:10px;color:#cbd5e1">O(n log n)</span></div>'
-            . '<div style="position:absolute;bottom:8px;left:14px;right:14px;border-top:1px solid #334155;padding-top:5px;display:flex;align-items:center;justify-content:space-between">'
-            . '<span style="font-size:7px;font-weight:700;color:#94a3b8">' . $pvSiteName . '</span>'
-            . '<span style="font-size:6px;color:#64748b">' . $pvSiteUrl . '</span></div>'
-            . '</div></div>';
+        $qotdTplPv = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        if (empty(trim($qotdTplPv ?? ''))) $qotdTplPv = self::getDefaultTemplateHtml();
+        $qotdCssLPv = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+        if (empty(trim($qotdCssLPv ?? ''))) $qotdCssLPv = self::getDefaultCssLight();
+        $qotdCssDPv = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+        if (empty(trim($qotdCssDPv ?? ''))) $qotdCssDPv = self::getDefaultCssDark();
+
+        $qotdPvData = [
+            '{{KATEX_CSS}}' => '', '{{SITE_NAME}}' => $pvSiteName,
+            '{{LOGO}}' => $logoFullTag, '{{QUESTION}}' => $sampleQuestion,
+            '{{OPTIONS}}' => $sampleOptions, '{{SITE_URL}}' => $pvSiteUrl,
+        ];
+        $lightPreview = $this->buildIframePreview('smp-pv-light', $qotdTplPv, $qotdCssLPv, $qotdPvData, 480, $showLight === 'block', 'Light');
+        $darkPreview = $this->buildIframePreview('smp-pv-dark', $qotdTplPv, $qotdCssDPv, $qotdPvData, 480, $showDark === 'block', 'Dark');
 
         $fields['image_style_preview'] = [
             'type' => 'static',
@@ -899,48 +881,30 @@ class SmpAdmin
             'label' => '<h3 style="margin:20px 0 8px;color:#9b59b6;border-bottom:1px solid #9b59b6;padding-bottom:4px;">Quote of the Day Template</h3>',
         ];
 
-        $logoPvInverted = $logoPreviewTag ? str_replace('margin:0 auto 4px', 'margin:0 auto 4px;filter:invert(1) brightness(1.5)', $logoPreviewTag) : '';
-        $logoPvDarkSmall = str_replace('height:18px', 'height:14px', $logoPvInverted);
-        $logoPvLightSmall = str_replace('height:18px', 'height:14px', $logoPreviewTag);
-
         $showQuoteLight = ($currentStyle === 'light') ? 'block' : 'none';
         $showQuoteDark = ($currentStyle === 'dark') ? 'block' : 'none';
 
-        $quotePreviewLight = '<div id="smp-pv-quote-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#2a1152,#0d1b3e)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#c792ea,#89b4fa,#a78bfa)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
-            . '<div style="text-align:center;margin:2px 0 4px"><span style="background:rgba(199,146,234,0.3);color:#c792ea;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(199,146,234,0.4)">QUOTE OF THE DAY</span></div>'
-            . '<div style="text-align:center;font-family:Georgia,serif;font-size:24px;color:#c792ea;line-height:1">&ldquo;</div>'
-            . '<div style="text-align:center;padding:0 14px;font-family:Georgia,serif;font-size:9px;line-height:1.5;color:#f0f0ff">Success is not final, failure is not fatal: it is the courage to continue that counts.</div>'
-            . '<div style="text-align:center;font-family:Georgia,serif;font-size:14px;color:#c792ea;line-height:1">&rdquo;</div>'
-            . '<div style="text-align:center;font-size:6px;color:rgba(200,200,230,0.7);margin-top:2px">&mdash; Winston Churchill</div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.1);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
+        $quoteTplPv = qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE);
+        if (empty(trim($quoteTplPv ?? ''))) $quoteTplPv = self::getDefaultQuoteTemplateHtml();
+        $quoteCssLPv = qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
+        if (empty(trim($quoteCssLPv ?? ''))) $quoteCssLPv = self::getDefaultQuoteCss();
+        $quoteCssDPv = qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK);
+        if (empty(trim($quoteCssDPv ?? ''))) $quoteCssDPv = self::getDefaultQuoteCssDark();
 
-        $quotePreviewDark = '<div id="smp-pv-quote-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#1a0a2e,#0a1628)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#a78bfa,#6366f1,#818cf8)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
-            . '<div style="text-align:center;margin:2px 0 4px"><span style="background:rgba(139,92,246,0.3);color:#a78bfa;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(139,92,246,0.4)">QUOTE OF THE DAY</span></div>'
-            . '<div style="text-align:center;font-family:Georgia,serif;font-size:24px;color:#a78bfa;line-height:1">&ldquo;</div>'
-            . '<div style="text-align:center;padding:0 14px;font-family:Georgia,serif;font-size:9px;line-height:1.5;color:#e2e8f0">Success is not final, failure is not fatal: it is the courage to continue that counts.</div>'
-            . '<div style="text-align:center;font-family:Georgia,serif;font-size:14px;color:#a78bfa;line-height:1">&rdquo;</div>'
-            . '<div style="text-align:center;font-size:6px;color:rgba(148,163,184,0.7);margin-top:2px">&mdash; Winston Churchill</div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
-
-        $quoteToggle = '<div style="margin:4px 0 6px">'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-quote-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-quote-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-quote-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-quote-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
-            '</div>';
+        $quotePvData = [
+            '{{SITE_NAME}}' => $pvSiteName, '{{LOGO}}' => $logoFullTag,
+            '{{SITE_URL}}' => $pvSiteUrl,
+            '{{QUOTE}}' => 'Success is not final, failure is not fatal: it is the courage to continue that counts.',
+            '{{ATTRIBUTION}}' => '&mdash; Winston Churchill',
+            '{{HASHTAGS}}' => '#motivation #success',
+        ];
+        $quotePreviewLight = $this->buildIframePreview('smp-pv-quote-light', $quoteTplPv, $quoteCssLPv, $quotePvData, 480, true, 'Light');
+        $quotePreviewDark = $this->buildIframePreview('smp-pv-quote-dark', $quoteTplPv, $quoteCssDPv, $quotePvData, 480, true, 'Dark');
 
         $fields['quote_preview'] = [
             'type' => 'static',
-            'label' => 'Quote Preview:',
-            'value' => $quoteToggle . $quotePreviewLight . $quotePreviewDark,
+            'label' => 'Quote Preview (Light &amp; Dark):',
+            'value' => '<div style="display:flex;gap:16px;flex-wrap:wrap">' . $quotePreviewLight . $quotePreviewDark . '</div>',
         ];
 
         $defaultQuoteCssLight = self::getDefaultQuoteCss();
@@ -985,37 +949,24 @@ class SmpAdmin
             'label' => '<h3 style="margin:20px 0 8px;color:#00897b;border-bottom:1px solid #00897b;padding-bottom:4px;">Exam Template</h3>',
         ];
 
-        $examPreviewLight = '<div id="smp-pv-exam-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#004d40,#0d47a1)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
-            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#00e6be">&#x270F;</div>'
-            . '<div style="text-align:center;margin:2px 0 8px"><span style="background:rgba(0,200,170,0.25);color:#fff;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(0,200,170,0.4)">NEW EXAM</span></div>'
-            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#fff">GATE CSE 2027 Mock Test Series</div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
+        $examTplPv = qa_opt(SmpConstants::OPT_EXAM_TEMPLATE);
+        if (empty(trim($examTplPv ?? ''))) $examTplPv = self::getDefaultExamTemplateHtml();
+        $examCssLPv = qa_opt(SmpConstants::OPT_EXAM_CSS_LIGHT);
+        if (empty(trim($examCssLPv ?? ''))) $examCssLPv = self::getDefaultExamCss();
+        $examCssDPv = qa_opt(SmpConstants::OPT_EXAM_CSS_DARK);
+        if (empty(trim($examCssDPv ?? ''))) $examCssDPv = self::getDefaultExamCssDark();
 
-        $examPreviewDark = '<div id="smp-pv-exam-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#0a2a25,#0a1832)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
-            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#2dd4bf">&#x270F;</div>'
-            . '<div style="text-align:center;margin:2px 0 8px"><span style="background:rgba(45,212,191,0.2);color:#5eead4;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(45,212,191,0.3)">NEW EXAM</span></div>'
-            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#e2e8f0">GATE CSE 2027 Mock Test Series</div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
-
-        $examToggle = '<div style="margin:4px 0 6px">'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-exam-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-exam-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-exam-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-exam-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
-            '</div>';
+        $examPvData = [
+            '{{SITE_NAME}}' => $pvSiteName, '{{LOGO}}' => $logoFullTag,
+            '{{SITE_URL}}' => $pvSiteUrl, '{{TITLE}}' => 'GATE CSE 2027 Mock Test Series',
+        ];
+        $examPreviewLight = $this->buildIframePreview('smp-pv-exam-light', $examTplPv, $examCssLPv, $examPvData, 480, true, 'Light');
+        $examPreviewDark = $this->buildIframePreview('smp-pv-exam-dark', $examTplPv, $examCssDPv, $examPvData, 480, true, 'Dark');
 
         $fields['exam_preview'] = [
             'type' => 'static',
-            'label' => 'Exam Preview:',
-            'value' => $examToggle . $examPreviewLight . $examPreviewDark,
+            'label' => 'Exam Preview (Light &amp; Dark):',
+            'value' => '<div style="display:flex;gap:16px;flex-wrap:wrap">' . $examPreviewLight . $examPreviewDark . '</div>',
         ];
 
         $defaultExamCssLight = self::getDefaultExamCss();
@@ -1060,39 +1011,24 @@ class SmpAdmin
             'label' => '<h3 style="margin:20px 0 8px;color:#e65100;border-bottom:1px solid #e65100;padding-bottom:4px;">Job Template</h3>',
         ];
 
-        $jobPreviewLight = '<div id="smp-pv-job-light" style="' . $pvBoxStyle . 'display:' . $showQuoteLight . ';background:linear-gradient(180deg,#880e4f,#311b92)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#ffa726,#ffb74d,#ffcc02)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvLightSmall . '</div>'
-            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#ffb74d">&#x2605;</div>'
-            . '<div style="text-align:center;margin:2px 0 6px"><span style="background:rgba(255,167,38,0.25);color:#fff;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(255,167,38,0.4)">JOB OPENING</span></div>'
-            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#fff">Senior Software Engineer — Remote</div>'
-            . '<div style="text-align:center;margin-top:6px"><span style="background:#ffa726;color:#311b42;font-size:6px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:3px">APPLY NOW</span></div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.15);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.5)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.3)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
+        $jobTplPv = qa_opt(SmpConstants::OPT_JOB_TEMPLATE);
+        if (empty(trim($jobTplPv ?? ''))) $jobTplPv = self::getDefaultJobTemplateHtml();
+        $jobCssLPv = qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT);
+        if (empty(trim($jobCssLPv ?? ''))) $jobCssLPv = self::getDefaultJobCss();
+        $jobCssDPv = qa_opt(SmpConstants::OPT_JOB_CSS_DARK);
+        if (empty(trim($jobCssDPv ?? ''))) $jobCssDPv = self::getDefaultJobCssDark();
 
-        $jobPreviewDark = '<div id="smp-pv-job-dark" style="' . $pvBoxStyle . 'display:' . $showQuoteDark . ';background:linear-gradient(180deg,#2d0a1e,#1a0e3a)">'
-            . '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#fb923c,#f97316,#fdba74)"></div>'
-            . '<div style="text-align:center;margin:8px 0 2px">' . $logoPvDarkSmall . '</div>'
-            . '<div style="text-align:center;margin:4px 0 2px;font-size:20px;color:#fb923c">&#x2605;</div>'
-            . '<div style="text-align:center;margin:2px 0 6px"><span style="background:rgba(251,146,60,0.2);color:#fdba74;font-size:6px;font-weight:700;letter-spacing:1.5px;padding:2px 8px;border-radius:8px;border:1px solid rgba(251,146,60,0.3)">JOB OPENING</span></div>'
-            . '<div style="text-align:center;padding:0 14px;font-size:12px;font-weight:700;line-height:1.4;color:#e2e8f0">Senior Software Engineer — Remote</div>'
-            . '<div style="text-align:center;margin-top:6px"><span style="background:#fb923c;color:#1a0e3a;font-size:6px;font-weight:700;letter-spacing:1px;padding:2px 10px;border-radius:3px">APPLY NOW</span></div>'
-            . '<div style="position:absolute;bottom:10px;left:8px;right:8px;border-top:1px solid rgba(255,255,255,0.08);padding-top:3px;display:flex;justify-content:space-between">'
-            . '<span style="font-size:5px;font-weight:700;color:rgba(255,255,255,0.4)">' . $pvSiteName . '</span>'
-            . '<span style="font-size:4px;color:rgba(255,255,255,0.2)">' . $pvSiteUrl . '</span></div>'
-            . '</div>';
-
-        $jobToggle = '<div style="margin:4px 0 6px">'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-job-light&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-job-dark&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;margin-right:4px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f8f8f8">Light</button>'.
-            '<button type="button" onclick="document.getElementById(&#39;smp-pv-job-dark&#39;).style.display=&#39;block&#39;;document.getElementById(&#39;smp-pv-job-light&#39;).style.display=&#39;none&#39;;" style="padding:3px 10px;font-size:11px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#333;color:#fff">Dark</button>'.
-            '</div>';
+        $jobPvData = [
+            '{{SITE_NAME}}' => $pvSiteName, '{{LOGO}}' => $logoFullTag,
+            '{{SITE_URL}}' => $pvSiteUrl, '{{TITLE}}' => 'Senior Software Engineer &mdash; Remote',
+        ];
+        $jobPreviewLight = $this->buildIframePreview('smp-pv-job-light', $jobTplPv, $jobCssLPv, $jobPvData, 480, true, 'Light');
+        $jobPreviewDark = $this->buildIframePreview('smp-pv-job-dark', $jobTplPv, $jobCssDPv, $jobPvData, 480, true, 'Dark');
 
         $fields['job_preview'] = [
             'type' => 'static',
-            'label' => 'Job Preview:',
-            'value' => $jobToggle . $jobPreviewLight . $jobPreviewDark,
+            'label' => 'Job Preview (Light &amp; Dark):',
+            'value' => '<div style="display:flex;gap:16px;flex-wrap:wrap">' . $jobPreviewLight . $jobPreviewDark . '</div>',
         ];
 
         $defaultJobCssLight = self::getDefaultJobCss();
@@ -1129,6 +1065,66 @@ class SmpAdmin
             'value' => htmlspecialchars($jobTemplateValue, ENT_QUOTES, 'UTF-8'),
             'tags' => 'NAME="smp_job_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
             'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{TITLE}}</code>',
+        ];
+
+        // Live-preview JavaScript: updates iframe previews when CSS/template textareas change
+        $pvLogoJs = json_encode($logoFullTag, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $pvSiteNameJs = json_encode($pvSiteName, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $pvSiteUrlJs = json_encode($pvSiteUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT);
+        $pvImgWJs = (int)(qa_opt(SmpConstants::OPT_IMAGE_WIDTH) ?: 1080);
+        $pvImgHJs = (int)(qa_opt(SmpConstants::OPT_IMAGE_HEIGHT) ?: 1080);
+
+        $livePreviewJs = '<script>
+(function(){
+var W=' . $pvImgWJs . ',H=' . $pvImgHJs . ',LOGO=' . $pvLogoJs . ',SITE=' . $pvSiteNameJs . ',URL=' . $pvSiteUrlJs . ',DS=480;
+var scale=Math.round(DS/W*10000)/10000,scaleH=Math.round(H*scale);
+var sampleQ="<p>The time complexity of building a heap of n elements is?</p>";
+var sampleOpts=\'<div class="option"><div class="option-label">A</div><div class="option-text">O(n)</div></div><div class="option"><div class="option-label">B</div><div class="option-text">O(n log n)</div></div><div class="option"><div class="option-label">C</div><div class="option-text">O(n&sup2;)</div></div><div class="option"><div class="option-label">D</div><div class="option-text">O(log n)</div></div>\';
+var sampleQuote="Success is not final, failure is not fatal: it is the courage to continue that counts.";
+var sampleAttr="&mdash; Winston Churchill";
+var configs=[
+{iframe:"smp-pv-light-iframe",css:"smp_image_css_light",tpl:"smp_image_template",reps:{"{{KATEX_CSS}}":"","{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{QUESTION}}":sampleQ,"{{OPTIONS}}":sampleOpts,"{{SITE_URL}}":URL}},
+{iframe:"smp-pv-dark-iframe",css:"smp_image_css_dark",tpl:"smp_image_template",reps:{"{{KATEX_CSS}}":"","{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{QUESTION}}":sampleQ,"{{OPTIONS}}":sampleOpts,"{{SITE_URL}}":URL}},
+{iframe:"smp-pv-quote-light-iframe",css:"smp_quote_css_light",tpl:"smp_quote_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{QUOTE}}":sampleQuote,"{{ATTRIBUTION}}":sampleAttr,"{{HASHTAGS}}":"#motivation #success"}},
+{iframe:"smp-pv-quote-dark-iframe",css:"smp_quote_css_dark",tpl:"smp_quote_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{QUOTE}}":sampleQuote,"{{ATTRIBUTION}}":sampleAttr,"{{HASHTAGS}}":"#motivation #success"}},
+{iframe:"smp-pv-exam-light-iframe",css:"smp_exam_css_light",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series"}},
+{iframe:"smp-pv-exam-dark-iframe",css:"smp_exam_css_dark",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series"}},
+{iframe:"smp-pv-job-light-iframe",css:"smp_job_css_light",tpl:"smp_job_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"Senior Software Engineer &mdash; Remote"}},
+{iframe:"smp-pv-job-dark-iframe",css:"smp_job_css_dark",tpl:"smp_job_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"Senior Software Engineer &mdash; Remote"}}
+];
+function getTA(name){return document.querySelector("textarea[name="+name+"]")||document.querySelector("input[name="+name+"]");}
+function buildHtml(c){
+var tpl=getTA(c.tpl),css=getTA(c.css);if(!tpl||!css)return null;
+var cssVal=css.value.replace(/\\{\\{WIDTH\\}\\}/g,W).replace(/\\{\\{HEIGHT\\}\\}/g,H);
+var html=tpl.value;html=html.replace(/<link[^>]*href="[^"]*"[^>]*>/g,"");
+for(var k in c.reps)html=html.split(k).join(c.reps[k]);
+html=html.replace("{{CSS}}",cssVal);
+html=html.replace("</head>","<style>html{overflow:hidden!important}body{transform:scale("+scale+")!important;transform-origin:top left!important}</style></head>");
+return html;
+}
+var timers={};
+function refreshPreview(idx){
+var c=configs[idx],ifr=document.getElementById(c.iframe);if(!ifr)return;
+var html=buildHtml(c);if(!html)return;
+ifr.srcdoc=html;
+}
+function debounceRefresh(idx){
+if(timers[idx])clearTimeout(timers[idx]);
+timers[idx]=setTimeout(function(){refreshPreview(idx);},600);
+}
+configs.forEach(function(c,i){
+var css=getTA(c.css),tpl=getTA(c.tpl);
+if(css)css.addEventListener("input",function(){debounceRefresh(i);});
+if(tpl)tpl.addEventListener("input",function(){
+configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
+});
+});
+})();
+</script>';
+
+        $fields['live_preview_js'] = [
+            'type' => 'custom',
+            'html' => $livePreviewJs,
         ];
 
         $fields['btn_save_image_settings'] = [
@@ -2827,5 +2823,37 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
 <span class="url">{{SITE_URL}}</span>
 </div>
 </body></html>';
+    }
+
+    /**
+     * Build an iframe-based preview that renders the actual template+CSS scaled down.
+     */
+    private function buildIframePreview(string $id, string $template, string $css, array $replacements, int $displaySize, bool $visible = true, string $label = ''): string
+    {
+        $imgW = (int)(qa_opt(SmpConstants::OPT_IMAGE_WIDTH) ?: 1080);
+        $imgH = (int)(qa_opt(SmpConstants::OPT_IMAGE_HEIGHT) ?: 1080);
+        $css = str_replace(['{{WIDTH}}', '{{HEIGHT}}'], [$imgW, $imgH], $css);
+        $replacements['{{CSS}}'] = $css;
+        $html = str_replace(array_keys($replacements), array_values($replacements), $template);
+        // Remove KaTeX CSS link (not available in iframe preview)
+        $html = preg_replace('/<link[^>]*href="[^"]*"[^>]*>/', '', $html);
+
+        $scale = round($displaySize / $imgW, 4);
+        $scaledH = (int)round($imgH * $scale);
+        $display = $visible ? 'inline-block' : 'none';
+
+        // Inject scaling CSS inside the HTML so the iframe can be at display size
+        $scaleStyle = '<style>html{overflow:hidden!important}body{transform:scale(' . $scale . ')!important;transform-origin:top left!important}</style>';
+        $html = str_replace('</head>', $scaleStyle . '</head>', $html);
+
+        $srcdoc = htmlspecialchars($html, ENT_QUOTES, 'UTF-8');
+
+        $labelHtml = $label ? '<div style="text-align:center;font-size:11px;font-weight:600;color:#666;margin-bottom:4px;">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</div>' : '';
+
+        return '<div id="' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8') . '" style="margin:8px 0;display:' . $display . '">'
+            . $labelHtml
+            . '<div style="border-radius:8px;overflow:hidden;width:' . $displaySize . 'px;height:' . $scaledH . 'px;box-shadow:0 2px 12px rgba(0,0,0,.15);">'
+            . '<iframe id="' . htmlspecialchars($id, ENT_QUOTES, 'UTF-8') . '-iframe" srcdoc="' . $srcdoc . '" style="width:' . $displaySize . 'px;height:' . $scaledH . 'px;border:none;" sandbox="allow-same-origin"></iframe>'
+            . '</div></div>';
     }
 }
