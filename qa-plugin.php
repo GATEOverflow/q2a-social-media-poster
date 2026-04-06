@@ -5,6 +5,9 @@ if (!defined('QA_VERSION')) {
     exit;
 }
 
+// Make plugin directory available for other plugins to load SMP classes
+define('SMP_PLUGIN_DIR', dirname(__FILE__) . '/');
+
 // Register admin module
 qa_register_plugin_module('process', 'SmpAdmin.php', 'SmpAdmin', 'Social Media Poster Admin');
 
