@@ -100,6 +100,7 @@ class SmpImageGenerator
         );
         exec($measureCmd, $mOut, $mExit);
 
+        $needsCompact = false;
         if ($mExit === 0 && file_exists($measurePng)) {
             $measureImg = @imagecreatefrompng($measurePng);
             if ($measureImg) {
@@ -107,16 +108,49 @@ class SmpImageGenerator
                 imagedestroy($measureImg);
                 @unlink($measurePng);
 
-                // If content exceeds the target height, it won't fit — return null
+                // If content exceeds the target height, retry with smaller font + clip
                 if ($naturalHeight > $h + 80) {
-                    @unlink($tempHtml);
-                    return null;
+                    $needsCompact = true;
                 }
             } else {
                 @unlink($measurePng);
             }
         } else {
             @unlink($measurePng);
+        }
+
+        // If content overflows, rebuild HTML with smaller fonts and a fade-clip at the bottom
+        if ($needsCompact) {
+            @unlink($tempHtml);
+
+            $compactCss = '
+.question-card p,.question-card{font-size:28px !important;line-height:1.4 !important}
+.question-card ol,.question-card ul{font-size:27px !important;line-height:1.35 !important}
+.question-card table{font-size:25px !important}
+.question-card td,.question-card th{padding:5px 10px !important}
+.question-card pre,.question-card code{font-size:25px !important}
+.option-text{font-size:26px !important;line-height:1.3 !important}
+.option{padding:10px 18px !important;margin-bottom:7px !important}
+.option-label{width:36px !important;height:36px !important;min-width:36px !important;font-size:22px !important}
+.badge span{font-size:18px !important;padding:5px 20px !important}
+.content{padding:0 40px 72px !important}
+.question-card{padding:18px 24px !important;margin-bottom:12px !important}
+.content::after{content:"";position:absolute;bottom:72px;left:0;right:0;height:100px;background:linear-gradient(transparent,var(--bg-color,#ffffff));pointer-events:none;z-index:2}
+';
+            // Detect dark mode for fade gradient color
+            $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
+            if ($style === 'dark') {
+                $compactCss = str_replace('var(--bg-color,#ffffff)', '#0f172a', $compactCss);
+            }
+
+            $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h);
+            // Inject compact CSS before </style>
+            $html = str_replace('</style>', $compactCss . '</style>', $html);
+            $html = $this->renderMathServerSide($html);
+            $html = $this->addWebkitGradients($html);
+
+            $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
+            file_put_contents($tempHtml, $html);
         }
 
         // Run wkhtmltoimage at fixed dimensions (no JS needed — math is pre-rendered)
