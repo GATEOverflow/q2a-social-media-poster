@@ -77,7 +77,7 @@ class SmpImageGenerator
         }
 
         // Build the full HTML page
-        $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h);
+        $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean);
 
         // Pre-render math server-side via Node.js KaTeX
         $html = $this->renderMathServerSide($html);
@@ -143,7 +143,7 @@ class SmpImageGenerator
                 $compactCss = str_replace('var(--bg-color,#ffffff)', '#0f172a', $compactCss);
             }
 
-            $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h);
+            $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean);
             // Inject compact CSS before </style>
             $html = str_replace('</style>', $compactCss . '</style>', $html);
             $html = $this->renderMathServerSide($html);
@@ -213,7 +213,7 @@ class SmpImageGenerator
     /**
      * Build the HTML page for QOTD image rendering.
      */
-    private function buildQotdHtml(string $questionHtml, string $optionsDivs, string $siteName, string $siteHost, int $w, int $h): string
+    private function buildQotdHtml(string $questionHtml, string $optionsDivs, string $siteName, string $siteHost, int $w, int $h, string $titleText = ''): string
     {
         // Use local KaTeX CSS file (fonts load relative to it)
         $katexCssPath = __DIR__ . '/node_modules/katex/dist/katex.min.css';
@@ -246,8 +246,8 @@ class SmpImageGenerator
         }
 
         return str_replace(
-            ['{{KATEX_CSS}}', '{{CSS}}', '{{SITE_NAME}}', '{{LOGO}}', '{{QUESTION}}', '{{OPTIONS}}', '{{SITE_URL}}'],
-            [$katexCssUrl, $css, $siteName, $logoTag, $questionHtml, $optionsDivs, $siteHost],
+            ['{{KATEX_CSS}}', '{{CSS}}', '{{SITE_NAME}}', '{{LOGO}}', '{{TITLE}}', '{{QUESTION}}', '{{OPTIONS}}', '{{SITE_URL}}'],
+            [$katexCssUrl, $css, $siteName, $logoTag, $titleText, $questionHtml, $optionsDivs, $siteHost],
             $template
         );
     }
@@ -263,6 +263,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#ffffff;font-family:"Segoe
 .header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto}
 .badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
 .badge span{display:inline-block;background:#2563EB;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.q-title{text-align:center;padding:4px 50px 10px;font-size:26px;font-weight:600;color:#64748b;position:relative;z-index:1;letter-spacing:0.3px}
 .content{padding:0 50px 72px;position:relative;z-index:1}
 .question-card{background:#f8fafc;border-radius:14px;padding:24px 30px;border-left:5px solid #2563EB;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
 .question-card p,.question-card{font-size:36px;line-height:1.5;color:#1a1a2e}
@@ -298,6 +299,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe
 .header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.2)}
 .badge{text-align:center;margin-bottom:12px;position:relative;z-index:1}
 .badge span{display:inline-block;background:#6366f1;color:#fff;font-size:22px;font-weight:700;letter-spacing:2.5px;padding:7px 26px;border-radius:20px}
+.q-title{text-align:center;padding:4px 50px 10px;font-size:26px;font-weight:600;color:#94a3b8;position:relative;z-index:1;letter-spacing:0.3px}
 .content{padding:0 50px 72px;position:relative;z-index:1}
 .question-card{background:#1e293b;border-radius:14px;padding:24px 30px;border-left:5px solid #6366f1;margin-bottom:16px;box-shadow:0 2px 16px rgba(0,0,0,0.3)}
 .question-card p,.question-card{font-size:36px;line-height:1.5;color:#e2e8f0}
@@ -332,6 +334,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe
 <div class="watermark">{{SITE_NAME}}</div>
 <div class="header">{{LOGO}}</div>
 <div class="badge"><span>QUESTION OF THE DAY</span></div>
+<div class="q-title">{{TITLE}}</div>
 <div class="content">
 <div class="question-card">{{QUESTION}}</div>
 <div class="options">{{OPTIONS}}</div>
