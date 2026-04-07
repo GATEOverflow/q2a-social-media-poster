@@ -82,6 +82,10 @@ class SmpImageGenerator
         // Pre-render math server-side via Node.js KaTeX
         $html = $this->renderMathServerSide($html);
 
+        // Strip <span class="katex-mathml">...</span> (accessibility MathML) —
+        // wkhtmltoimage's old WebKit ignores clip:rect and display:none on these
+        $html = $this->stripKatexMathml($html);
+
         // Add -webkit- gradient prefixes for wkhtmltoimage (older WebKit)
         $html = $this->addWebkitGradients($html);
 
@@ -147,6 +151,7 @@ class SmpImageGenerator
             // Inject compact CSS before </style>
             $html = str_replace('</style>', $compactCss . '</style>', $html);
             $html = $this->renderMathServerSide($html);
+            $html = $this->stripKatexMathml($html);
             $html = $this->addWebkitGradients($html);
 
             $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
@@ -211,6 +216,16 @@ class SmpImageGenerator
     }
 
     /**
+     * Strip <span class="katex-mathml">...</span> blocks from rendered HTML.
+     * wkhtmltoimage's old WebKit doesn't reliably hide these via CSS.
+     */
+    private function stripKatexMathml(string $html): string
+    {
+        // katex-mathml contains <math>...</math> (no nested <span>), then closes with </span>
+        return preg_replace('/<span class="katex-mathml"><math[\s\S]*?<\/math><\/span>/', '', $html) ?? $html;
+    }
+
+    /**
      * Build the HTML page for QOTD image rendering.
      */
     private function buildQotdHtml(string $questionHtml, string $optionsDivs, string $siteName, string $siteHost, int $w, int $h, string $titleText = ''): string
@@ -237,6 +252,8 @@ class SmpImageGenerator
             $css = !empty(trim($customCss ?? '')) ? $customCss : $this->getQotdCssLight();
         }
         $css = str_replace(['{{WIDTH}}', '{{HEIGHT}}'], [$w, $h], $css);
+        // Force-hide .katex-mathml (wkhtmltoimage's old WebKit doesn't support clip:rect)
+        $css .= "\n.katex-mathml{display:none!important}\n";
 
         $customTemplate = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
         if (!empty(trim($customTemplate ?? ''))) {

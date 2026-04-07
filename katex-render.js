@@ -92,7 +92,35 @@ function _fixKatexCompat(tex, isDisplay) {
     return tex;
 }
 
+/**
+ * Decode HTML entities within LaTeX content (same as site's _texFromHtml).
+ * The DB stores content as HTML, so math delimiters may contain &lt; &gt; &amp; etc.
+ */
+function _texFromHtml(html) {
+    let s = html;
+    // Convert block-level tags to newlines
+    s = s.replace(/<br\s*\/?>/gi, '\n');
+    s = s.replace(/<\/p>/gi, '\n');
+    s = s.replace(/<p[^>]*>/gi, '');
+    s = s.replace(/<\/div>/gi, '\n');
+    s = s.replace(/<div[^>]*>/gi, '');
+    // Handle common HTML entities
+    s = s.replace(/&nbsp;/gi, ' ');
+    s = s.replace(/&lt;/gi, '<');
+    s = s.replace(/&gt;/gi, '>');
+    s = s.replace(/&amp;/gi, '&');
+    s = s.replace(/&quot;/gi, '"');
+    s = s.replace(/&#(\d+);/g, (m, code) => String.fromCharCode(parseInt(code)));
+    s = s.replace(/&#x([0-9a-fA-F]+);/g, (m, code) => String.fromCharCode(parseInt(code, 16)));
+    // Remove any remaining HTML tags
+    s = s.replace(/<[^>]+>/g, '');
+    return s;
+}
+
 function renderTex(tex, displayMode) {
+    tex = _texFromHtml(tex);
+    // Escape bare % (LaTeX comment char) — content from HTML has no intentional comments
+    tex = tex.replace(/(?<!\\)%/g, '\\%');
     tex = _fixKatexCompat(tex, displayMode);
     return katex.renderToString(tex, { throwOnError: false, displayMode: displayMode });
 }
@@ -103,7 +131,17 @@ process.stdin.on('data', chunk => { input += chunk; });
 process.stdin.on('end', () => {
     let html = input;
 
-    // Replace $$...$$ display math first
+    // 1. Handle <script type="math/tex">...</script> tags (legacy MathJax format)
+    html = html.replace(/<script[^>]*type=["']math\/tex(?:;\s*mode=display)?["'][^>]*>([\s\S]*?)<\/script>/gi, (match, tex) => {
+        const isDisplay = /mode=display/i.test(match);
+        try {
+            return renderTex(tex.trim(), isDisplay);
+        } catch (e) {
+            return match;
+        }
+    });
+
+    // 2. Replace $$...$$ display math first
     html = html.replace(/\$\$([\s\S]+?)\$\$/g, (match, tex) => {
         try {
             return renderTex(tex.trim(), true);
@@ -112,7 +150,16 @@ process.stdin.on('end', () => {
         }
     });
 
-    // Replace $...$ inline math (not $$)
+    // 3. Replace $...\begin{...}...\end{...}...$ (inline with environments)
+    html = html.replace(/\$([^\$]*?\\begin\{[^\$]*?)\$/g, (match, tex) => {
+        try {
+            return renderTex(tex.trim(), false);
+        } catch (e) {
+            return match;
+        }
+    });
+
+    // 4. Replace $...$ inline math (not $$)
     html = html.replace(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g, (match, tex) => {
         try {
             return renderTex(tex.trim(), false);
@@ -121,7 +168,7 @@ process.stdin.on('end', () => {
         }
     });
 
-    // Replace \(...\) inline math
+    // 5. Replace \(...\) inline math
     html = html.replace(/\\\((.+?)\\\)/g, (match, tex) => {
         try {
             return renderTex(tex.trim(), false);
@@ -130,10 +177,21 @@ process.stdin.on('end', () => {
         }
     });
 
-    // Replace \[...\] display math
+    // 6. Replace \[...\] display math
     html = html.replace(/\\\[([\s\S]+?)\\\]/g, (match, tex) => {
         try {
             return renderTex(tex.trim(), true);
+        } catch (e) {
+            return match;
+        }
+    });
+
+    // 7. Handle bare \begin{env}...\end{env} outside of $ delimiters
+    html = html.replace(/\\begin\{([^}]+)\}([\s\S]*?)\\end\{\1\}/g, (match, env, inner) => {
+        try {
+            const tex = '\\begin{' + env + '}' + _texFromHtml(inner) + '\\end{' + env + '}';
+            const fixed = _fixKatexCompat(tex, true);
+            return katex.renderToString(fixed, { displayMode: true, throwOnError: false });
         } catch (e) {
             return match;
         }
