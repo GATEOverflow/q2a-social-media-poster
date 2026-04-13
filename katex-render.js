@@ -23,14 +23,32 @@ function _fixTextUnderscores(tex) {
     const re = /\\text(?:bf|it|rm|sf|tt|normal)?\s*\{/g;
     let result = '', i = 0, m;
     while ((m = re.exec(tex)) !== null) {
-        result += tex.substring(i, m.index) + m[0];
-        let start = m.index + m[0].length, braces = 1, j = start;
+        const cmd = m[0];
+        result += tex.substring(i, m.index);
+        let start = m.index + cmd.length, braces = 1, j = start;
         while (j < tex.length && braces > 0) {
             if (tex[j] === '{') braces++;
             else if (tex[j] === '}') braces--;
             if (braces > 0) j++;
         }
-        result += tex.substring(start, j).replace(/(?<!\\)_/g, '\\_') + '}';
+        let inner = tex.substring(start, j);
+        /* Handle nested $...$ — exit text, insert math, re-enter text */
+        const parts = inner.split(/(?<!\\)\$/g);
+        if (parts.length >= 3) {
+            let rebuilt = '';
+            for (let pi = 0; pi < parts.length; pi++) {
+                if (pi % 2 === 0) {
+                    const t = parts[pi].replace(/(?<!\\)_/g, '\\_').replace(/(?<!\\)#/g, '\\#');
+                    if (t.length > 0 || pi === 0) rebuilt += cmd + t + '}';
+                } else {
+                    rebuilt += parts[pi];
+                }
+            }
+            result += rebuilt;
+        } else {
+            inner = inner.replace(/(?<!\\)_/g, '\\_').replace(/(?<!\\)#/g, '\\#');
+            result += cmd + inner + '}';
+        }
         i = j + 1; re.lastIndex = i;
     }
     return result + tex.substring(i);
