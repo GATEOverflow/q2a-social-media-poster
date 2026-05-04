@@ -66,6 +66,12 @@ $poster = new SmpDailyPoster();
 $poster->load_module(__DIR__ . '/', '');
 $poster->runDailyPosts();
 
+// Run auto-reply bot
+require_once __DIR__ . '/SmpAutoReply.php';
+$autoReply = new SmpAutoReply();
+$autoReply->load_module(__DIR__ . '/', '');
+$autoReply->runNow();
+
 $output = 'SMP cron executed at ' . date('Y-m-d H:i:s');
 
 if (php_sapi_name() === 'cli') {

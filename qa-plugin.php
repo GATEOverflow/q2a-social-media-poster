@@ -23,6 +23,9 @@ qa_register_plugin_module('process', 'SmpTokenChecker.php', 'SmpTokenChecker', '
 // Register daily poster (QOTD & Quote of the Day)
 qa_register_plugin_module('process', 'SmpDailyPoster.php', 'SmpDailyPoster', 'SMP Daily Poster');
 
+// Register auto-reply bot (spam detection + reply to social media comments)
+qa_register_plugin_module('process', 'SmpAutoReply.php', 'SmpAutoReply', 'SMP Auto Reply Bot');
+
 // Register Google OAuth callback page
 qa_register_plugin_module('page', 'SmpOAuthCallback.php', 'SmpOAuthCallback', 'SMP OAuth Callback');
 

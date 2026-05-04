@@ -117,6 +117,10 @@ class SmpAdmin
             $this->saveDailySettings();
             $saved = true;
         }
+        if (qa_clicked('smp_save_autoreply_settings') || $saveAll) {
+            $this->saveAutoReplySettings();
+            $saved = true;
+        }
 
         // Quote bank actions
         if (qa_clicked('smp_generate_quote_bank')) {
@@ -702,6 +706,78 @@ class SmpAdmin
         $fields['quote_bank'] = [
             'type' => 'custom',
             'html' => $quoteBankHtml,
+        ];
+
+        // ========== SECTION: Auto-Reply Bot ==========
+        $fields['section_autoreply'] = [
+            'type' => 'static',
+            'label' => '<h2 style="margin:20px 0 10px;border-bottom:2px solid #00897b;padding-bottom:5px;color:#00897b;">Auto-Reply Bot</h2>',
+        ];
+        $fields['autoreply_desc'] = [
+            'type' => 'static',
+            'label' => 'Monitors Telegram and Facebook for new messages/comments. Uses Gemini AI to detect spam, auto-reply to questions, or email you for manual review.',
+        ];
+
+        require_once $this->directory . 'SmpAutoReply.php';
+
+        $fields['autoreply_enabled'] = [
+            'label' => 'Enable Auto-Reply Bot:',
+            'type' => 'checkbox',
+            'value' => (int)qa_opt(SmpAutoReply::OPT_ENABLED),
+            'tags' => 'NAME="smp_autoreply_enabled"',
+        ];
+
+        $intervalVal = (int)(qa_opt(SmpAutoReply::OPT_INTERVAL) ?: 12);
+        $fields['autoreply_interval'] = [
+            'label' => 'Check interval (hours):',
+            'type' => 'number',
+            'value' => $intervalVal,
+            'tags' => 'NAME="smp_autoreply_interval" MIN="1" MAX="168" STYLE="width:80px;"',
+            'note' => 'How often to check for new replies (default: 12 hours)',
+        ];
+
+        $fields['autoreply_model'] = [
+            'label' => 'Gemini model:',
+            'value' => qa_opt(SmpAutoReply::OPT_GEMINI_MODEL) ?: 'gemini-2.5-flash',
+            'tags' => 'NAME="smp_autoreply_gemini_model" SIZE="30"',
+            'note' => 'Uses the shared Gemini API key (openai_gemini_api_key option)',
+        ];
+
+        $fields['autoreply_spam_action'] = [
+            'label' => 'Spam action:',
+            'type' => 'select',
+            'options' => ['delete' => 'Delete (Telegram) / Hide (Facebook)', 'log' => 'Log only (no deletion)'],
+            'value' => qa_opt(SmpAutoReply::OPT_SPAM_ACTION) ?: 'delete',
+            'tags' => 'NAME="smp_autoreply_spam_action"',
+        ];
+
+        $fields['autoreply_log'] = [
+            'label' => 'Email run summary:',
+            'type' => 'checkbox',
+            'value' => (int)qa_opt(SmpAutoReply::OPT_LOG_ENABLED),
+            'tags' => 'NAME="smp_autoreply_log"',
+            'note' => 'Send an email summary after each bot run (only if actions were taken)',
+        ];
+
+        $fields['autoreply_prompt'] = [
+            'label' => 'Custom instructions for the bot:',
+            'type' => 'text',
+            'value' => qa_opt(SmpAutoReply::OPT_SYSTEM_PROMPT) ?: '',
+            'tags' => 'NAME="smp_autoreply_prompt" ROWS="4" COLS="80" STYLE="width:100%;max-width:600px;min-height:80px;"',
+            'note' => 'Optional extra instructions appended to the Gemini system prompt',
+        ];
+
+        $lastRun = qa_opt(SmpAutoReply::OPT_LAST_RUN);
+        $fields['autoreply_status'] = [
+            'type' => 'static',
+            'label' => '<div style="background:#e0f2f1;border:1px solid #80cbc4;border-radius:6px;padding:10px 14px;margin:5px 0;font-size:12px;">'
+                . '<strong>Last run:</strong> ' . ($lastRun ? htmlspecialchars($lastRun, ENT_QUOTES, 'UTF-8') : '<em>Never</em>')
+                . '</div>',
+        ];
+
+        $fields['autoreply_save'] = [
+            'type' => 'static',
+            'label' => '<button type="submit" name="smp_save_autoreply_settings" style="background:#00897b;color:#fff;border:none;padding:6px 18px;border-radius:3px;cursor:pointer;">Save Auto-Reply Settings</button>',
         ];
 
         // ========== SECTION: Instagram & YouTube Media Settings ==========
@@ -2315,6 +2391,18 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
 
         $cronKey = trim(qa_post_text('smp_cron_key') ?? '');
         qa_opt(SmpConstants::OPT_CRON_KEY, $cronKey);
+    }
+
+    private function saveAutoReplySettings(): void
+    {
+        require_once $this->directory . 'SmpAutoReply.php';
+        qa_opt(SmpAutoReply::OPT_ENABLED, (int)qa_post_text('smp_autoreply_enabled'));
+        $interval = max(1, min(168, (int)qa_post_text('smp_autoreply_interval')));
+        qa_opt(SmpAutoReply::OPT_INTERVAL, $interval ?: 12);
+        qa_opt(SmpAutoReply::OPT_GEMINI_MODEL, trim(qa_post_text('smp_autoreply_gemini_model') ?: 'gemini-2.5-flash'));
+        qa_opt(SmpAutoReply::OPT_SPAM_ACTION, qa_post_text('smp_autoreply_spam_action') ?: 'delete');
+        qa_opt(SmpAutoReply::OPT_LOG_ENABLED, (int)qa_post_text('smp_autoreply_log'));
+        qa_opt(SmpAutoReply::OPT_SYSTEM_PROMPT, trim(qa_post_text('smp_autoreply_prompt') ?? ''));
     }
 
     private function saveCategoryRouting(): void
