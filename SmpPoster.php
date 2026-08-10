@@ -2011,9 +2011,11 @@ class SmpPoster
                     $refreshResult = $this->refreshMetaToken($currentToken, $appId, $appSecret);
 
                     if ($refreshResult['success']) {
-                        $account['credentials'][$tokenField] = $refreshResult['access_token'];
-                        $expiresIn = $refreshResult['expires_in'] ?? 5184000;
-                        $account['token_expiry_date'] = date('Y-m-d', time() + $expiresIn);
+                        $newToken = $refreshResult['access_token'];
+                        $account['credentials'][$tokenField] = $newToken;
+                        // Probe actual expiry from Meta API; fall back to expires_in if unavailable
+                        $probedExpiry = $this->probeMetaTokenExpiry($newToken);
+                        $account['token_expiry_date'] = $probedExpiry ?? date('Y-m-d', time() + ($refreshResult['expires_in'] ?? 5184000));
                         $account['token_expiry_source'] = 'auto-refresh';
                         $account['token_last_refreshed'] = date('Y-m-d H:i:s');
                         $accountsChanged = true;
