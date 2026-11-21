@@ -60,6 +60,9 @@ class SmpConstants
     const OPT_LAST_EXPIRY_CHECK = 'smp_last_expiry_check';
     const OPT_EXPIRY_NOTIFIED = 'smp_expiry_notified';
     const OPT_LAST_TOKEN_REFRESH = 'smp_last_token_refresh';
+    const OPT_RECENT_POSTS = 'smp_recent_posts';
+    const OPT_EXAM_QUEUE = 'smp_exam_queue';
+    const OPT_EXAM_PALETTE_LAST = 'smp_exam_palette_last';
 
     // Daily poster option keys
     const OPT_QOTD_ENABLED = 'smp_qotd_enabled';
@@ -182,6 +185,70 @@ class SmpConstants
         
         $cache[$tableName] = ($result !== null);
         return $cache[$tableName];
+    }
+
+    // Appended to every AI system prompt so generated content reads like a human mentor wrote it
+    const AI_VOICE_GUIDELINES = 'Voice: write as an experienced Indian GATE CSE mentor in the style of Arjun Suresh of GATE Overflow: '
+        . 'direct, practical, honest and encouraging, in simple Indian English, like a senior guiding juniors. '
+        . 'Avoid hype and marketing buzzwords (unlock, elevate, dive into, embark, journey, game-changer, supercharge). '
+        . 'Do not use emojis, emoticons or decorative symbols/icons (sparkles, rockets, arrows, check marks, stars, fire, bullets). '
+        . 'Do not use em dashes or markdown formatting. Never mention being an AI and do not sign off with any name. '
+        . 'Never use stock phrases such as: you\'ve got this, attention aspirants, don\'t miss out, make sure to check it out, '
+        . 'keep pushing, stay tuned, gear up, level up, exciting news, we are thrilled, are you ready.';
+
+    // Checked in code as well, since the model does not always follow the instruction above
+    const BANNED_PHRASES = [
+        'attention gate', 'attention aspirants', 'attention students', 'you\'ve got this', 'you’ve got this',
+        'don\'t miss', 'don’t miss', 'make sure to check', 'keep pushing', 'stay tuned', 'gear up',
+        'level up', 'exciting news', 'thrilled', 'are you ready',
+    ];
+
+    /**
+     * Writing angles rotated per content type so consecutive posts don't read alike.
+     */
+    public static function getPostAngles(string $contentType): array
+    {
+        $angles = [
+            self::CONTENT_EXAM => [
+                'a study tip tied to the subjects covered in the test',
+                'a warning about where students typically lose marks in such tests',
+                'a time-management nudge for attempting a timed test',
+                'a direct challenge with a realistic target score',
+                'bust a common myth about mock tests',
+                'stress analysing mistakes after the test rather than only the score',
+            ],
+            self::CONTENT_QUESTION => [
+                'why this question is worth trying',
+                'the core concept this question tests',
+                'a common trap students fall into on such questions',
+                'challenge readers to solve it within a few minutes',
+                'how GATE tends to ask this topic',
+            ],
+            self::CONTENT_BLOG => [
+                'the single most useful takeaway',
+                'who should read this and why',
+                'a practical tip from the post',
+                'the question this post answers',
+            ],
+            self::CONTENT_JOB => [
+                'who should apply',
+                'the skills this role needs',
+                'why this is a good opportunity for GATE aspirants or freshers',
+                'a plain reminder to apply before the deadline',
+            ],
+        ];
+        return $angles[$contentType] ?? ['a plain, informative announcement', 'one practical tip', 'a question to the reader'];
+    }
+
+    /**
+     * Remove emojis and decorative pictographs that make text look AI-generated.
+     */
+    public static function cleanAiText(string $text): string
+    {
+        $text = preg_replace('/[\x{1F000}-\x{1FAFF}\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{FE0F}\x{200D}]/u', '', $text) ?? $text;
+        $text = str_replace("\u{2014}", ' - ', $text);
+        $text = preg_replace('/[ \t]{2,}/', ' ', $text) ?? $text;
+        return trim(preg_replace('/^[ \t]+|[ \t]+$/m', '', $text) ?? $text);
     }
 
     /**

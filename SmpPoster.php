@@ -280,7 +280,7 @@ class SmpPoster
                 continue;
             }
 
-            $result = $this->postToPlatform($platform, $account, $message, $imageUrl, $extra);
+            $result = $this->postToPlatform($platform, $account, $extra['platform_messages'][$platform] ?? $message, $imageUrl, $extra);
             $result['account_name'] = $account['name'] ?? $accountId;
             $result['platform'] = $platform;
             $results[$accountId] = $result;
@@ -1285,7 +1285,7 @@ class SmpPoster
     /**
      * Low-level OpenAI chat completion call.
      */
-    private function callOpenAI(string $systemPrompt, string $userMessage, int $maxTokens = 300): ?string
+    private function callOpenAI(string $systemPrompt, string $userMessage, int $maxTokens = 300, bool $json = false, ?float $temperature = null): ?string
     {
         $apiKey = qa_opt(SmpConstants::OPT_OPENAI_KEY);
         if (empty($apiKey)) {
@@ -1296,11 +1296,17 @@ class SmpPoster
         $data = [
             'model' => 'gpt-4o-mini',
             'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'system', 'content' => $systemPrompt . "\n\n" . SmpConstants::AI_VOICE_GUIDELINES],
                 ['role' => 'user', 'content' => $userMessage],
             ],
             'max_tokens' => $maxTokens,
         ];
+        if ($json) {
+            $data['response_format'] = ['type' => 'json_object'];
+        }
+        if ($temperature !== null) {
+            $data['temperature'] = $temperature;
+        }
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -1321,7 +1327,150 @@ class SmpPoster
         }
 
         $result = json_decode($response, true);
-        return $result['choices'][0]['message']['content'] ?? null;
+        $content = $result['choices'][0]['message']['content'] ?? null;
+        return $content === null ? null : SmpConstants::cleanAiText($content);
+    }
+
+    /**
+     * Generate a short catchy headline for the exam announcement image.
+     */
+    public function generateExamHook(string $title): string
+    {
+        $hook = $this->callOpenAI(
+            'Write one short, catchy headline (at most 8 words) for an image announcing a new GATE CSE test. '
+            . 'It should sound like a mentor nudging students to check their preparation honestly, not like an advert. '
+            . 'Do not repeat the test title and avoid words like ace, master, conquer, crush or now. '
+            . 'Return only the headline, without quotes, hashtags or a trailing period.',
+            $title,
+            40
+        );
+        $hook = trim((string)$hook, " \t\n\r\"'.");
+        return $hook !== '' ? $hook : 'New test is live. Are you ready?';
+    }
+
+    /**
+     * Compose per-platform post text with a rotating angle, avoiding wording from recent posts.
+     * The link is appended here so it is never altered by the AI.
+     *
+     * @return array ['default' => string, 'platforms' => [platform => string], 'headline' => string]
+     */
+    public function composePost(string $contentType, string $content, string $link, string $linkLabel = 'Link'): array
+    {
+        $recent = $this->getRecentPosts($contentType);
+        $recentTexts = array_column($recent, 'text');
+        $angle = $this->pickAngle($contentType, array_slice(array_column($recent, 'angle'), 0, 3));
+
+        $system = (qa_opt(SmpConstants::OPT_OPENAI_CONFIG) ?: 'Create a short social media announcement for the following content.')
+            . "\n\nAngle for this post: " . $angle . '. Only use facts (subjects, numbers, stats) given in the details; never invent or add others.'
+            . "\n\nReturn a JSON object with these keys:\n"
+            . "\"telegram\": 3 to 5 sentences for a student community;\n"
+            . "\"facebook\": 2 to 4 sentences;\n"
+            . "\"instagram\": 1 or 2 short sentences, then 3 to 5 relevant hashtags on a new line;\n"
+            . "\"x\": one sharp sentence of at most 200 characters with at most 2 hashtags;\n"
+            . "\"headline\": an image headline of at most 8 words: a mentor nudging students to check their preparation honestly, "
+            . "not an announcement (avoid 'new', 'available', 'live') and not repeating the title.\n"
+            . 'Do not include any URL. Every value must be plain text.';
+        if ($recentTexts) {
+            $system .= "\n\nRecent posts of this type. Do not reuse their openings, closings, sentence structure or phrases:\n- "
+                . implode("\n- ", $recentTexts);
+        }
+
+        $variants = null;
+        for ($attempt = 0; $attempt < 2; $attempt++) {
+            $raw = $this->callOpenAI($system, $content, 700, true, $attempt ? 1.1 : 0.9);
+            $decoded = $raw ? json_decode($raw, true) : null;
+            if (!is_array($decoded) || empty($decoded['facebook']) || !is_string($decoded['facebook'])) {
+                continue;
+            }
+            $variants = array_map(fn($v) => is_string($v) ? SmpConstants::cleanAiText($v) : '', $decoded);
+            $bannedHit = $this->findBannedPhrase(implode("\n", $variants));
+            if ($bannedHit === null && $this->maxSimilarity($variants['facebook'], $recentTexts) < 0.5) {
+                break;
+            }
+            $system .= $bannedHit !== null
+                ? "\n\nYour previous draft used the banned phrase \"" . $bannedHit . '". Rewrite without it.'
+                : "\n\nYour previous draft was too similar to a recent post. Use a completely different opening, structure and wording.";
+        }
+
+        if ($variants === null) {
+            $fallback = $this->openaiGenerateMessage($content);
+            $variants = ['facebook' => $fallback, 'headline' => ''];
+        }
+
+        $main = $variants['facebook'];
+        $withLink = fn(string $t) => trim($t) . "\n\n" . $linkLabel . ': ' . $link;
+
+        // X counts any URL as 23 characters; keep room for the newline and link
+        $xText = trim($variants['x'] ?? '') ?: $main;
+        if (mb_strlen($xText) > 255) {
+            $xText = preg_replace('/\s+\S*$/u', '', mb_substr($xText, 0, 252)) . '...';
+        }
+
+        $this->saveRecentPost($contentType, $main, $angle);
+
+        return [
+            'default' => $withLink($main),
+            'platforms' => [
+                SmpConstants::PLATFORM_TELEGRAM => htmlspecialchars($withLink(($variants['telegram'] ?? '') ?: $main), ENT_NOQUOTES, 'UTF-8'),
+                SmpConstants::PLATFORM_FACEBOOK => $withLink($main),
+                SmpConstants::PLATFORM_INSTAGRAM => $withLink(($variants['instagram'] ?? '') ?: $main),
+                SmpConstants::PLATFORM_X => $xText . "\n" . $link,
+            ],
+            'headline' => trim($variants['headline'] ?? '', " \t\n\r\"'."),
+        ];
+    }
+
+    private function findBannedPhrase(string $text): ?string
+    {
+        $lower = mb_strtolower($text);
+        foreach (SmpConstants::BANNED_PHRASES as $phrase) {
+            if (mb_strpos($lower, $phrase) !== false) {
+                return $phrase;
+            }
+        }
+        return null;
+    }
+
+    private function pickAngle(string $contentType, array $recentAngles): string
+    {
+        $angles = SmpConstants::getPostAngles($contentType);
+        $fresh = array_values(array_diff($angles, $recentAngles)) ?: $angles;
+        return $fresh[array_rand($fresh)];
+    }
+
+    /**
+     * Highest word-set (Jaccard) similarity between $text and any of $others.
+     */
+    private function maxSimilarity(string $text, array $others): float
+    {
+        $words = fn(string $s) => array_unique(preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s), -1, PREG_SPLIT_NO_EMPTY));
+        $a = $words($text);
+        $max = 0.0;
+        foreach ($others as $other) {
+            $b = $words($other);
+            $union = count(array_unique(array_merge($a, $b)));
+            if ($union > 0) {
+                $max = max($max, count(array_intersect($a, $b)) / $union);
+            }
+        }
+        return $max;
+    }
+
+    /**
+     * Most recent first: [['text' => ..., 'angle' => ..., 'at' => ...], ...]
+     */
+    public function getRecentPosts(string $contentType): array
+    {
+        $list = json_decode(qa_opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType) ?: '[]', true);
+        return is_array($list) ? $list : [];
+    }
+
+    private function saveRecentPost(string $contentType, string $text, string $angle): void
+    {
+        $list = $this->getRecentPosts($contentType);
+        array_unshift($list, ['text' => mb_substr($text, 0, 280), 'angle' => $angle, 'at' => date('Y-m-d H:i')]);
+        // Options are stored in a size-limited column, so keep only a short history
+        qa_opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType, json_encode(array_slice($list, 0, 8)));
     }
 
     /**

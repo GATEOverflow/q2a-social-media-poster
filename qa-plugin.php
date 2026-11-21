@@ -14,6 +14,7 @@ qa_register_plugin_module('process', 'SmpAdmin.php', 'SmpAdmin', 'Social Media P
 // Register event handlers
 qa_register_plugin_module('event', 'SmpEventQuestion.php', 'SmpEventQuestion', 'SMP Event Question');
 qa_register_plugin_module('event', 'SmpEventExam.php', 'SmpEventExam', 'SMP Event Exam');
+qa_register_plugin_module('process', 'SmpEventExam.php', 'SmpEventExam', 'SMP Exam Batch Flusher');
 qa_register_plugin_module('event', 'SmpEventBlog.php', 'SmpEventBlog', 'SMP Event Blog');
 qa_register_plugin_module('event', 'SmpEventJob.php', 'SmpEventJob', 'SMP Event Job');
 

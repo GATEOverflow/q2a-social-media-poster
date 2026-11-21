@@ -51,10 +51,8 @@ class SmpEventQuestion
         // Generate message using OpenAI if available
         $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
         $messageInput = $title . "\n" . mb_substr($rawContent, 0, 500);
-        $generatedMessage = $poster->openaiGenerateMessage($messageInput);
-
-        // Build final message with URL
-        $message = $generatedMessage . "\n\n" . $url;
+        $composed = $poster->composePost(SmpConstants::CONTENT_QUESTION, $messageInput, $url, 'Discuss');
+        $message = $composed['default'];
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
@@ -70,7 +68,7 @@ class SmpEventQuestion
         }
 
         // Post to all enabled accounts (with category routing + user accounts)
-        $extra = ['categoryid' => $categoryId, 'title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts];
+        $extra = ['categoryid' => $categoryId, 'title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts, 'platform_messages' => $composed['platforms']];
         $results = $poster->postToAll(SmpConstants::CONTENT_QUESTION, $message, $imageUrl, $extra);
 
         // Report any failures

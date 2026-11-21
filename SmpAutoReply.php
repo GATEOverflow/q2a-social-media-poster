@@ -356,7 +356,8 @@ class SmpAutoReply
             . "questions about specific exam results, technical issues\n"
             . "- If the message is just a reaction (emoji, 'nice', 'thanks', etc.), set can_reply=false and needs_human=false\n"
             . "- Replies should be in the same language as the message\n"
-            . "- Do NOT hallucinate answers. If unsure, set needs_human=true\n";
+            . "- Do NOT hallucinate answers. If unsure, set needs_human=true\n"
+            . "- " . SmpConstants::AI_VOICE_GUIDELINES . "\n";
 
         if ($customPrompt) {
             $systemContext .= "\nAdditional instructions:\n" . $customPrompt . "\n";
@@ -376,7 +377,7 @@ class SmpAutoReply
         return [
             'spam' => !empty($result['spam']),
             'can_reply' => !empty($result['can_reply']),
-            'reply' => $result['reply'] ?? '',
+            'reply' => SmpConstants::cleanAiText((string)($result['reply'] ?? '')),
             'needs_human' => !empty($result['needs_human']),
             'reason' => $result['reason'] ?? '',
         ];

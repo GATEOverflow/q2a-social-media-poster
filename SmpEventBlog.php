@@ -52,9 +52,8 @@ class SmpEventBlog
         // Generate message using OpenAI
         $rawContent = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
         $messageInput = $title . "\n" . mb_substr($rawContent, 0, 500);
-        $generatedMessage = $poster->openaiGenerateMessage($messageInput);
-
-        $message = $generatedMessage . "\n\n" . $url;
+        $composed = $poster->composePost(SmpConstants::CONTENT_BLOG, $messageInput, $url, 'Read');
+        $message = $composed['default'];
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
@@ -70,7 +69,7 @@ class SmpEventBlog
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts]);
+        $results = $poster->postToAll(SmpConstants::CONTENT_BLOG, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $manualAccounts + $userAccounts, 'platform_messages' => $composed['platforms']]);
 
         // Report failures
         foreach ($results as $accountId => $result) {

@@ -506,53 +506,87 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#1a
 
     // ======================== Exam Templates ========================
 
-    private function getDefaultExamTemplate(): string
+    public static function getDefaultExamTemplate(): string
     {
         return '<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <style>{{CSS}}</style></head><body>
-<div class="accent-bar"></div>
-<div class="header">{{LOGO}}</div>
-<div class="icon">&#x270F;</div>
-<div class="badge"><span>NEW EXAM</span></div>
+<div class="ring r1"></div><div class="ring r2"></div>
+<div class="top"><span class="logo-chip">{{LOGO}}</span></div>
+<div class="kicker"><span>{{KICKER}}</span></div>
+<div class="hook">{{HOOK}}</div>
 <div class="title">{{TITLE}}</div>
-<div class="branding">
-<span class="site">{{SITE_NAME}}</span>
-<span class="url">{{SITE_URL}}</span>
-</div>
+<div class="stats">{{STATS}}</div>
+<div class="cta"><span>Attempt now on {{SITE_URL}}</span></div>
+<div class="footer">{{SITE_NAME}}</div>
 </body></html>';
     }
 
-    private function getDefaultExamCss(): string
+    public static function getDefaultExamCss(): string
     {
-        return '*{margin:0;padding:0;box-sizing:border-box}
-body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#004d40 0%,#0d47a1 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)}
-.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
-.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
-.icon{text-align:center;font-size:80px;color:#00e6be;margin:10px 0;position:relative;z-index:1}
-.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
-.badge span{display:inline-block;background:rgba(0,200,170,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(0,200,170,0.4)}
-.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
-.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
-.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+        return self::buildExamCss(...self::examPalettes()[0]);
     }
 
-    private function getDefaultExamCssDark(): string
+    public static function getDefaultExamCssDark(): string
+    {
+        return self::buildExamCss('-webkit-linear-gradient(top,#050b1f 0%,#0f172a 60%,#1e1b4b 100%)', '#fbbf24', '#fbbf24', '#111827', '#bfdbfe');
+    }
+
+    /**
+     * Light-style palettes rotated between exam posts: [background, accent, CTA bg, CTA text, subtitle].
+     */
+    public static function examPalettes(): array
+    {
+        return [
+            ['-webkit-linear-gradient(top,#0b1d4a 0%,#1e3a8a 60%,#312e81 100%)', '#fbbf24', '#fff', '#1e3a8a', '#bfdbfe'],
+            ['-webkit-linear-gradient(top,#042f2e 0%,#115e59 60%,#134e4a 100%)', '#fde047', '#fff', '#115e59', '#ccfbf1'],
+            ['-webkit-linear-gradient(top,#3b0a1e 0%,#7f1d1d 60%,#450a0a 100%)', '#fcd34d', '#fff', '#7f1d1d', '#fecaca'],
+            ['-webkit-linear-gradient(top,#111827 0%,#1f2937 60%,#0f172a 100%)', '#fb923c', '#fb923c', '#111827', '#e5e7eb'],
+        ];
+    }
+
+    public static function examKickers(): array
+    {
+        return ['NEW TEST IS LIVE', 'FRESH MOCK TEST', 'TEST YOUR PREP', 'NEW PRACTICE TEST'];
+    }
+
+    // Old-syntax -webkit gradient is used directly because wkhtmltoimage misreads modern angle syntax
+    private static function buildExamCss(string $bg, string $accent, string $ctaBg, string $ctaColor, string $subColor): string
     {
         return '*{margin:0;padding:0;box-sizing:border-box}
-body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#0a2a25 0%,#0a1832 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)}
-.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
-.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
-.icon{text-align:center;font-size:80px;color:#2dd4bf;margin:10px 0;position:relative;z-index:1}
-.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
-.badge span{display:inline-block;background:rgba(45,212,191,0.2);color:#5eead4;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(45,212,191,0.3)}
-.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
-.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
-.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
+body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:' . $bg . ';font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
+.ring{position:absolute;border-radius:50%;border:60px solid rgba(251,191,36,0.08)}
+.r1{width:620px;height:620px;top:-260px;right:-240px}
+.r2{width:520px;height:520px;bottom:-280px;left:-220px;border-color:rgba(96,165,250,0.10)}
+.top{text-align:center;padding-top:56px;position:relative}
+.logo-chip{display:inline-block;background:#fff;border-radius:14px;padding:12px 22px}
+.logo-chip .logo{height:44px;width:auto;display:block}
+.kicker{text-align:center;margin-top:44px;position:relative}
+.kicker span{display:inline-block;white-space:nowrap;background:' . $accent . ';color:#111827;font-size:22px;font-weight:800;letter-spacing:4px;padding:10px 28px;border-radius:6px}
+.hook{margin:40px 70px 0;text-align:center;font-size:66px;font-weight:800;line-height:1.15;color:#fff;position:relative}
+.title{margin:30px 90px 0;text-align:center;font-size:34px;font-weight:600;line-height:1.35;color:' . $subColor . ';position:relative}
+.stats{position:absolute;left:52px;right:52px;bottom:280px}
+.stats table{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:18px 0}
+.stats td{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.18);border-radius:16px;text-align:center;padding:22px 0}
+.stats .num{display:block;font-size:56px;font-weight:800;color:' . $accent . ';line-height:1.1}
+.stats .lbl{display:block;font-size:22px;letter-spacing:2px;text-transform:uppercase;color:#dbeafe;margin-top:6px}
+.cta{position:absolute;left:0;right:0;bottom:130px;text-align:center}
+.cta span{display:inline-block;white-space:nowrap;background:' . $ctaBg . ';color:' . $ctaColor . ';font-size:30px;font-weight:800;padding:20px 46px;border-radius:50px}
+.footer{position:absolute;left:0;right:0;bottom:56px;text-align:center;font-size:22px;font-weight:600;letter-spacing:1px;color:rgba(255,255,255,0.55)}';
+    }
+
+    /**
+     * Build the stats row HTML (questions / minutes / marks) for the exam image.
+     */
+    public static function buildExamStatsHtml(array $details): string
+    {
+        $cells = '';
+        foreach (['tests' => 'Tests', 'questions' => 'Questions', 'minutes' => 'Minutes', 'marks' => 'Marks'] as $key => $label) {
+            if (!empty($details[$key])) {
+                $cells .= '<td><span class="num">' . (int)$details[$key] . '</span><span class="lbl">' . $label . '</span></td>';
+            }
+        }
+        return $cells === '' ? '' : '<table><tr>' . $cells . '</tr></table>';
     }
 
     // ======================== Job Templates ========================
@@ -1362,10 +1396,10 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
      * @param int|null $postId Post ID for unique filename
      * @return string|null Public URL of the generated image, or null on failure
      */
-    public function generateExamImage(string $title, ?int $postId = null): ?string
+    public function generateExamImage(string $title, ?int $postId = null, array $details = []): ?string
     {
         // Try HTML template rendering via wkhtmltoimage first
-        $htmlResult = $this->generateExamFromHtml($title, $postId);
+        $htmlResult = $this->generateExamFromHtml($title, $postId, $details);
         if ($htmlResult !== null) {
             return $htmlResult;
         }
@@ -1374,23 +1408,39 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
         return $this->generateExamImageGd($title, $postId);
     }
 
-    private function generateExamFromHtml(string $title, ?int $postId = null): ?string
+    private function generateExamFromHtml(string $title, ?int $postId = null, array $details = []): ?string
     {
         $common = $this->getCommonPlaceholders();
         $titleClean = htmlspecialchars(html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
+        $hook = htmlspecialchars($details['hook'] ?? '', ENT_QUOTES, 'UTF-8');
+        $kickers = self::examKickers();
+        $kicker = htmlspecialchars($details['kicker'] ?? $kickers[array_rand($kickers)], ENT_QUOTES, 'UTF-8');
+
+        // Rotate palettes (light style, no custom CSS) so consecutive exam images look different
+        $defaultCssLight = self::getDefaultExamCss();
+        if ((qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light') !== 'dark' && trim(qa_opt(SmpConstants::OPT_EXAM_CSS_LIGHT) ?? '') === '') {
+            $palettes = self::examPalettes();
+            $choices = array_values(array_diff(array_keys($palettes), [(int)qa_opt(SmpConstants::OPT_EXAM_PALETTE_LAST)]));
+            $idx = $choices[array_rand($choices)];
+            qa_opt(SmpConstants::OPT_EXAM_PALETTE_LAST, $idx);
+            $defaultCssLight = self::buildExamCss(...$palettes[$idx]);
+        }
 
         $html = $this->buildFromTemplate(
             SmpConstants::OPT_EXAM_TEMPLATE,
             SmpConstants::OPT_EXAM_CSS_LIGHT,
             SmpConstants::OPT_EXAM_CSS_DARK,
-            $this->getDefaultExamTemplate(),
-            $this->getDefaultExamCss(),
-            $this->getDefaultExamCssDark(),
+            self::getDefaultExamTemplate(),
+            $defaultCssLight,
+            self::getDefaultExamCssDark(),
             [
                 '{{LOGO}}' => $common['logo'],
                 '{{SITE_NAME}}' => $common['siteName'],
                 '{{SITE_URL}}' => $common['siteUrl'],
                 '{{TITLE}}' => $titleClean,
+                '{{HOOK}}' => $hook,
+                '{{KICKER}}' => $kicker,
+                '{{STATS}}' => self::buildExamStatsHtml($details),
             ]
         );
 

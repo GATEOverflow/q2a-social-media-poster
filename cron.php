@@ -72,6 +72,12 @@ $autoReply = new SmpAutoReply();
 $autoReply->load_module(__DIR__ . '/', '');
 $autoReply->runNow();
 
+// Post any batched exams whose waiting window has passed
+require_once __DIR__ . '/SmpEventExam.php';
+$examPoster = new SmpEventExam();
+$examPoster->load_module(__DIR__ . '/', '');
+$examPoster->flushQueue();
+
 $output = 'SMP cron executed at ' . date('Y-m-d H:i:s');
 
 if (php_sapi_name() === 'cli') {

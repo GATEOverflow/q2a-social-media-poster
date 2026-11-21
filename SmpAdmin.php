@@ -1025,6 +1025,7 @@ class SmpAdmin
             'label' => '<h3 style="margin:20px 0 8px;color:#00897b;border-bottom:1px solid #00897b;padding-bottom:4px;">Exam Template</h3>',
         ];
 
+        require_once $this->directory . 'SmpImageGenerator.php';
         $examTplPv = qa_opt(SmpConstants::OPT_EXAM_TEMPLATE);
         if (empty(trim($examTplPv ?? ''))) $examTplPv = self::getDefaultExamTemplateHtml();
         $examCssLPv = qa_opt(SmpConstants::OPT_EXAM_CSS_LIGHT);
@@ -1035,6 +1036,9 @@ class SmpAdmin
         $examPvData = [
             '{{SITE_NAME}}' => $pvSiteName, '{{LOGO}}' => $logoFullTag,
             '{{SITE_URL}}' => $pvSiteUrl, '{{TITLE}}' => 'GATE CSE 2027 Mock Test Series',
+            '{{HOOK}}' => 'Think you are GATE ready? Prove it today',
+            '{{KICKER}}' => 'NEW TEST IS LIVE',
+            '{{STATS}}' => SmpImageGenerator::buildExamStatsHtml(['questions' => 65, 'minutes' => 180, 'marks' => 100]),
         ];
         $examPreviewLight = $this->buildIframePreview('smp-pv-exam-light', $examTplPv, $examCssLPv, $examPvData, 480, true, 'Light');
         $examPreviewDark = $this->buildIframePreview('smp-pv-exam-dark', $examTplPv, $examCssDPv, $examPvData, 480, true, 'Dark');
@@ -1078,7 +1082,7 @@ class SmpAdmin
             'rows' => 10,
             'value' => htmlspecialchars($examTemplateValue, ENT_QUOTES, 'UTF-8'),
             'tags' => 'NAME="smp_exam_template" STYLE="width:100%;max-width:800px;font-family:monospace;font-size:12px;white-space:pre;overflow-x:auto" ROWS="10"',
-            'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{TITLE}}</code>',
+            'note' => 'Placeholders: <code>{{CSS}}</code> <code>{{LOGO}}</code> <code>{{SITE_NAME}}</code> <code>{{SITE_URL}}</code> <code>{{TITLE}}</code> <code>{{HOOK}}</code> (AI headline) <code>{{KICKER}}</code> (rotating label) <code>{{STATS}}</code> (tests/questions/minutes/marks)',
         ];
 
         // ============ JOB ============
@@ -1158,13 +1162,15 @@ var sampleQ="<p>The time complexity of building a heap of n elements is?</p>";
 var sampleOpts=\'<div class="option"><div class="option-label">A</div><div class="option-text">O(n)</div></div><div class="option"><div class="option-label">B</div><div class="option-text">O(n log n)</div></div><div class="option"><div class="option-label">C</div><div class="option-text">O(n&sup2;)</div></div><div class="option"><div class="option-label">D</div><div class="option-text">O(log n)</div></div>\';
 var sampleQuote="Success is not final, failure is not fatal: it is the courage to continue that counts.";
 var sampleAttr="&mdash; Winston Churchill";
+var sampleHook="Think you are GATE ready? Prove it today";
+var sampleStats=' . json_encode(SmpImageGenerator::buildExamStatsHtml(['questions' => 65, 'minutes' => 180, 'marks' => 100])) . ';
 var configs=[
 {iframe:"smp-pv-light-iframe",css:"smp_image_css_light",tpl:"smp_image_template",reps:{"{{KATEX_CSS}}":"","{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{QUESTION}}":sampleQ,"{{OPTIONS}}":sampleOpts,"{{SITE_URL}}":URL}},
 {iframe:"smp-pv-dark-iframe",css:"smp_image_css_dark",tpl:"smp_image_template",reps:{"{{KATEX_CSS}}":"","{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{QUESTION}}":sampleQ,"{{OPTIONS}}":sampleOpts,"{{SITE_URL}}":URL}},
 {iframe:"smp-pv-quote-light-iframe",css:"smp_quote_css_light",tpl:"smp_quote_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{QUOTE}}":sampleQuote,"{{ATTRIBUTION}}":sampleAttr,"{{HASHTAGS}}":"#motivation #success"}},
 {iframe:"smp-pv-quote-dark-iframe",css:"smp_quote_css_dark",tpl:"smp_quote_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{QUOTE}}":sampleQuote,"{{ATTRIBUTION}}":sampleAttr,"{{HASHTAGS}}":"#motivation #success"}},
-{iframe:"smp-pv-exam-light-iframe",css:"smp_exam_css_light",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series"}},
-{iframe:"smp-pv-exam-dark-iframe",css:"smp_exam_css_dark",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series"}},
+{iframe:"smp-pv-exam-light-iframe",css:"smp_exam_css_light",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series","{{HOOK}}":sampleHook,"{{KICKER}}":"NEW TEST IS LIVE","{{STATS}}":sampleStats}},
+{iframe:"smp-pv-exam-dark-iframe",css:"smp_exam_css_dark",tpl:"smp_exam_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"GATE CSE 2027 Mock Test Series","{{HOOK}}":sampleHook,"{{KICKER}}":"NEW TEST IS LIVE","{{STATS}}":sampleStats}},
 {iframe:"smp-pv-job-light-iframe",css:"smp_job_css_light",tpl:"smp_job_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"Senior Software Engineer &mdash; Remote"}},
 {iframe:"smp-pv-job-dark-iframe",css:"smp_job_css_dark",tpl:"smp_job_template",reps:{"{{SITE_NAME}}":SITE,"{{LOGO}}":LOGO,"{{SITE_URL}}":URL,"{{TITLE}}":"Senior Software Engineer &mdash; Remote"}}
 ];
@@ -2818,51 +2824,20 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#1a
 
     private static function getDefaultExamCss(): string
     {
-        return '*{margin:0;padding:0;box-sizing:border-box}
-body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#004d40 0%,#0d47a1 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#00c8aa,#00e6be,#4dd0e1)}
-.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
-.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
-.icon{text-align:center;font-size:80px;color:#00e6be;margin:10px 0;position:relative;z-index:1}
-.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
-.badge span{display:inline-block;background:rgba(0,200,170,0.25);color:#fff;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(0,200,170,0.4)}
-.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#fff;position:relative;z-index:1}
-.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.15);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.5)}
-.branding .url{font-size:16px;color:rgba(255,255,255,0.3)}';
+        require_once __DIR__ . '/SmpImageGenerator.php';
+        return SmpImageGenerator::getDefaultExamCss();
     }
 
     private static function getDefaultExamCssDark(): string
     {
-        return '*{margin:0;padding:0;box-sizing:border-box}
-body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#0a2a25 0%,#0a1832 100%);font-family:"Segoe UI","DejaVu Sans",Arial,sans-serif;color:#fff;position:relative;overflow:hidden}
-.accent-bar{position:absolute;top:0;left:0;right:0;height:8px;background:linear-gradient(90deg,#2dd4bf,#14b8a6,#5eead4)}
-.header{text-align:center;padding:30px 50px 0;position:relative;z-index:1}
-.header .logo{height:40px;width:auto;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;filter:invert(1) brightness(1.5)}
-.icon{text-align:center;font-size:80px;color:#2dd4bf;margin:10px 0;position:relative;z-index:1}
-.badge{text-align:center;margin:15px 0 30px;position:relative;z-index:1}
-.badge span{display:inline-block;background:rgba(45,212,191,0.2);color:#5eead4;font-size:24px;font-weight:700;letter-spacing:3px;padding:8px 30px;border-radius:20px;border:1px solid rgba(45,212,191,0.3)}
-.title{padding:0 80px;text-align:center;font-size:44px;font-weight:700;line-height:1.4;color:#e2e8f0;position:relative;z-index:1}
-.branding{position:absolute;bottom:30px;left:50px;right:50px;border-top:1px solid rgba(255,255,255,0.08);padding-top:12px;display:flex;align-items:center;justify-content:space-between}
-.branding .site{font-size:20px;font-weight:700;color:rgba(255,255,255,0.4)}
-.branding .url{font-size:16px;color:rgba(255,255,255,0.2)}';
+        require_once __DIR__ . '/SmpImageGenerator.php';
+        return SmpImageGenerator::getDefaultExamCssDark();
     }
 
     private static function getDefaultExamTemplateHtml(): string
     {
-        return '<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<style>{{CSS}}</style></head><body>
-<div class="accent-bar"></div>
-<div class="header">{{LOGO}}</div>
-<div class="icon">&#x270F;</div>
-<div class="badge"><span>NEW EXAM</span></div>
-<div class="title">{{TITLE}}</div>
-<div class="branding">
-<span class="site">{{SITE_NAME}}</span>
-<span class="url">{{SITE_URL}}</span>
-</div>
-</body></html>';
+        require_once __DIR__ . '/SmpImageGenerator.php';
+        return SmpImageGenerator::getDefaultExamTemplate();
     }
 
     // ======================== Job defaults ========================

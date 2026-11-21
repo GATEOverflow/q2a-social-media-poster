@@ -48,8 +48,8 @@ class SmpEventJob
         }
 
         // Generate message using OpenAI
-        $generatedMessage = $poster->openaiGenerateMessage($title, 'job posting');
-        $message = $generatedMessage . "\n\nApply here: " . $url;
+        $composed = $poster->composePost(SmpConstants::CONTENT_JOB, 'Job posting: ' . $title, $url, 'Apply here');
+        $message = $composed['default'];
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled
         $imageUrl = null;
@@ -65,7 +65,7 @@ class SmpEventJob
         }
 
         // Post to all enabled accounts
-        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $userAccounts]);
+        $results = $poster->postToAll(SmpConstants::CONTENT_JOB, $message, $imageUrl, ['title' => $title, '_manual_accounts' => $userAccounts, 'platform_messages' => $composed['platforms']]);
 
         // Report failures
         foreach ($results as $accountId => $result) {
