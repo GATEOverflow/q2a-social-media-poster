@@ -284,3 +284,34 @@ class SmpConstants
         return $platform . '_' . substr(md5(uniqid('', true)), 0, 8);
     }
 }
+
+/**
+ * Large SMP settings (templates, CSS, state blobs) live in ^smp_settings so they are not
+ * loaded with qa_options on every page; other keys pass through to qa_opt().
+ */
+class SmpSettings
+{
+    private static $cache = null;
+
+    public static function isStored(string $name): bool
+    {
+        return (bool)preg_match('/^smp_((image|quote|job)_(template|css_light|css_dark)|expiry_notified|recent_posts_.+)$/', $name);
+    }
+
+    /** Same contract as qa_opt(): read with one argument, write with two. */
+    public static function opt(string $name, $value = null)
+    {
+        if (!self::isStored($name)) {
+            return func_num_args() > 1 ? qa_opt($name, $value) : qa_opt($name);
+        }
+        if (self::$cache === null) {
+            self::$cache = qa_db_read_all_assoc(qa_db_query_sub('SELECT title, content FROM ^smp_settings'), 'title', 'content');
+        }
+        if (func_num_args() > 1) {
+            qa_db_query_sub('INSERT INTO ^smp_settings (title, content) VALUES ($, $) ON DUPLICATE KEY UPDATE content = VALUES(content)', $name, (string)$value);
+            self::$cache[$name] = (string)$value;
+            return $value;
+        }
+        return self::$cache[$name] ?? '';
+    }
+}

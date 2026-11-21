@@ -43,9 +43,10 @@ class SmpAdmin
 
     function init_queries($tableslc)
     {
+        $queries = [];
         $tablename = qa_db_add_table_prefix('smp_quotes');
         if (!in_array($tablename, $tableslc)) {
-            return 'CREATE TABLE IF NOT EXISTS ^smp_quotes ('
+            $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_quotes ('
                 . '`id` INT UNSIGNED NOT NULL AUTO_INCREMENT, '
                 . '`quote_date` DATE NOT NULL, '
                 . '`quote_text` TEXT NOT NULL, '
@@ -54,7 +55,18 @@ class SmpAdmin
                 . 'KEY `idx_date_status` (`quote_date`, `status`)'
                 . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
         }
-        return [];
+        if (!in_array(qa_db_add_table_prefix('smp_settings'), $tableslc)) {
+            $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_settings ('
+                . '`title` VARCHAR(64) NOT NULL PRIMARY KEY, '
+                . '`content` MEDIUMTEXT NOT NULL'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+            // move existing values out of qa_options
+            $moved = "(title IN ('smp_image_template','smp_image_css_light','smp_image_css_dark','smp_quote_template','smp_quote_css_light','smp_quote_css_dark',"
+                . "'smp_job_template','smp_job_css_light','smp_job_css_dark','smp_expiry_notified') OR title LIKE 'smp\\_recent\\_posts\\_%')";
+            $queries[] = 'INSERT IGNORE INTO ^smp_settings (title, content) SELECT title, content FROM ^options WHERE ' . $moved;
+            $queries[] = 'DELETE FROM ^options WHERE ' . $moved;
+        }
+        return $queries;
     }
 
     function admin_form(&$qa_content)
@@ -892,11 +904,11 @@ class SmpAdmin
             . '<div class="option"><div class="option-label">C</div><div class="option-text">O(n&sup2;)</div></div>'
             . '<div class="option"><div class="option-label">D</div><div class="option-text">O(log n)</div></div>';
 
-        $qotdTplPv = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        $qotdTplPv = SmpSettings::opt(SmpConstants::OPT_IMAGE_TEMPLATE);
         if (empty(trim($qotdTplPv ?? ''))) $qotdTplPv = self::getDefaultTemplateHtml();
-        $qotdCssLPv = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+        $qotdCssLPv = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
         if (empty(trim($qotdCssLPv ?? ''))) $qotdCssLPv = self::getDefaultCssLight();
-        $qotdCssDPv = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+        $qotdCssDPv = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_DARK);
         if (empty(trim($qotdCssDPv ?? ''))) $qotdCssDPv = self::getDefaultCssDark();
 
         $qotdPvData = [
@@ -915,7 +927,7 @@ class SmpAdmin
 
         // Editable CSS for light theme
         $defaultCssLight = self::getDefaultCssLight();
-        $currentCssLight = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+        $currentCssLight = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
         $cssLightValue = !empty(trim($currentCssLight ?? '')) ? $currentCssLight : $defaultCssLight;
         $fields['image_css_light'] = [
             'label' => 'Light Theme CSS:',
@@ -928,7 +940,7 @@ class SmpAdmin
 
         // Editable CSS for dark theme
         $defaultCssDark = self::getDefaultCssDark();
-        $currentCssDark = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+        $currentCssDark = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_DARK);
         $cssDarkValue = !empty(trim($currentCssDark ?? '')) ? $currentCssDark : $defaultCssDark;
         $fields['image_css_dark'] = [
             'label' => 'Dark Theme CSS:',
@@ -940,7 +952,7 @@ class SmpAdmin
         ];
 
         $defaultTemplate = self::getDefaultTemplateHtml();
-        $currentTemplate = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        $currentTemplate = SmpSettings::opt(SmpConstants::OPT_IMAGE_TEMPLATE);
         $templateValue = !empty(trim($currentTemplate ?? '')) ? $currentTemplate : $defaultTemplate;
         $fields['image_template'] = [
             'label' => 'QOTD HTML Template:',
@@ -960,11 +972,11 @@ class SmpAdmin
         $showQuoteLight = ($currentStyle === 'light') ? 'block' : 'none';
         $showQuoteDark = ($currentStyle === 'dark') ? 'block' : 'none';
 
-        $quoteTplPv = qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE);
+        $quoteTplPv = SmpSettings::opt(SmpConstants::OPT_QUOTE_TEMPLATE);
         if (empty(trim($quoteTplPv ?? ''))) $quoteTplPv = self::getDefaultQuoteTemplateHtml();
-        $quoteCssLPv = qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
+        $quoteCssLPv = SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
         if (empty(trim($quoteCssLPv ?? ''))) $quoteCssLPv = self::getDefaultQuoteCss();
-        $quoteCssDPv = qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK);
+        $quoteCssDPv = SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_DARK);
         if (empty(trim($quoteCssDPv ?? ''))) $quoteCssDPv = self::getDefaultQuoteCssDark();
 
         $quotePvData = [
@@ -984,7 +996,7 @@ class SmpAdmin
         ];
 
         $defaultQuoteCssLight = self::getDefaultQuoteCss();
-        $currentQuoteCssLight = qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
+        $currentQuoteCssLight = SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_LIGHT);
         $quoteCssLightValue = !empty(trim($currentQuoteCssLight ?? '')) ? $currentQuoteCssLight : $defaultQuoteCssLight;
         $fields['quote_css_light'] = [
             'label' => 'Quote Light CSS:',
@@ -996,7 +1008,7 @@ class SmpAdmin
         ];
 
         $defaultQuoteCssDark = self::getDefaultQuoteCssDark();
-        $currentQuoteCssDark = qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK);
+        $currentQuoteCssDark = SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_DARK);
         $quoteCssDarkValue = !empty(trim($currentQuoteCssDark ?? '')) ? $currentQuoteCssDark : $defaultQuoteCssDark;
         $fields['quote_css_dark'] = [
             'label' => 'Quote Dark CSS:',
@@ -1008,7 +1020,7 @@ class SmpAdmin
         ];
 
         $defaultQuoteTemplate = self::getDefaultQuoteTemplateHtml();
-        $currentQuoteTemplate = qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE);
+        $currentQuoteTemplate = SmpSettings::opt(SmpConstants::OPT_QUOTE_TEMPLATE);
         $quoteTemplateValue = !empty(trim($currentQuoteTemplate ?? '')) ? $currentQuoteTemplate : $defaultQuoteTemplate;
         $fields['quote_template'] = [
             'label' => 'Quote HTML Template:',
@@ -1091,11 +1103,11 @@ class SmpAdmin
             'label' => '<h3 style="margin:20px 0 8px;color:#e65100;border-bottom:1px solid #e65100;padding-bottom:4px;">Job Template</h3>',
         ];
 
-        $jobTplPv = qa_opt(SmpConstants::OPT_JOB_TEMPLATE);
+        $jobTplPv = SmpSettings::opt(SmpConstants::OPT_JOB_TEMPLATE);
         if (empty(trim($jobTplPv ?? ''))) $jobTplPv = self::getDefaultJobTemplateHtml();
-        $jobCssLPv = qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT);
+        $jobCssLPv = SmpSettings::opt(SmpConstants::OPT_JOB_CSS_LIGHT);
         if (empty(trim($jobCssLPv ?? ''))) $jobCssLPv = self::getDefaultJobCss();
-        $jobCssDPv = qa_opt(SmpConstants::OPT_JOB_CSS_DARK);
+        $jobCssDPv = SmpSettings::opt(SmpConstants::OPT_JOB_CSS_DARK);
         if (empty(trim($jobCssDPv ?? ''))) $jobCssDPv = self::getDefaultJobCssDark();
 
         $jobPvData = [
@@ -1112,7 +1124,7 @@ class SmpAdmin
         ];
 
         $defaultJobCssLight = self::getDefaultJobCss();
-        $currentJobCssLight = qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT);
+        $currentJobCssLight = SmpSettings::opt(SmpConstants::OPT_JOB_CSS_LIGHT);
         $jobCssLightValue = !empty(trim($currentJobCssLight ?? '')) ? $currentJobCssLight : $defaultJobCssLight;
         $fields['job_css_light'] = [
             'label' => 'Job Light CSS:',
@@ -1124,7 +1136,7 @@ class SmpAdmin
         ];
 
         $defaultJobCssDark = self::getDefaultJobCssDark();
-        $currentJobCssDark = qa_opt(SmpConstants::OPT_JOB_CSS_DARK);
+        $currentJobCssDark = SmpSettings::opt(SmpConstants::OPT_JOB_CSS_DARK);
         $jobCssDarkValue = !empty(trim($currentJobCssDark ?? '')) ? $currentJobCssDark : $defaultJobCssDark;
         $fields['job_css_dark'] = [
             'label' => 'Job Dark CSS:',
@@ -1136,7 +1148,7 @@ class SmpAdmin
         ];
 
         $defaultJobTemplate = self::getDefaultJobTemplateHtml();
-        $currentJobTemplate = qa_opt(SmpConstants::OPT_JOB_TEMPLATE);
+        $currentJobTemplate = SmpSettings::opt(SmpConstants::OPT_JOB_TEMPLATE);
         $jobTemplateValue = !empty(trim($currentJobTemplate ?? '')) ? $currentJobTemplate : $defaultJobTemplate;
         $fields['job_template'] = [
             'label' => 'Job HTML Template:',
@@ -2355,21 +2367,21 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
         }
 
         $template = qa_post_text('smp_image_template') ?? '';
-        qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE, trim($template));
+        SmpSettings::opt(SmpConstants::OPT_IMAGE_TEMPLATE, trim($template));
 
         $cssLight = qa_post_text('smp_image_css_light') ?? '';
-        qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT, trim($cssLight));
+        SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_LIGHT, trim($cssLight));
 
         $cssDark = qa_post_text('smp_image_css_dark') ?? '';
-        qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK, trim($cssDark));
+        SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_DARK, trim($cssDark));
 
         // Quote template
         $quoteCssLight = qa_post_text('smp_quote_css_light') ?? '';
-        qa_opt(SmpConstants::OPT_QUOTE_CSS_LIGHT, trim($quoteCssLight));
+        SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_LIGHT, trim($quoteCssLight));
         $quoteCssDark = qa_post_text('smp_quote_css_dark') ?? '';
-        qa_opt(SmpConstants::OPT_QUOTE_CSS_DARK, trim($quoteCssDark));
+        SmpSettings::opt(SmpConstants::OPT_QUOTE_CSS_DARK, trim($quoteCssDark));
         $quoteTemplate = qa_post_text('smp_quote_template') ?? '';
-        qa_opt(SmpConstants::OPT_QUOTE_TEMPLATE, trim($quoteTemplate));
+        SmpSettings::opt(SmpConstants::OPT_QUOTE_TEMPLATE, trim($quoteTemplate));
 
         // Exam template
         $examCssLight = qa_post_text('smp_exam_css_light') ?? '';
@@ -2381,11 +2393,11 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
 
         // Job template
         $jobCssLight = qa_post_text('smp_job_css_light') ?? '';
-        qa_opt(SmpConstants::OPT_JOB_CSS_LIGHT, trim($jobCssLight));
+        SmpSettings::opt(SmpConstants::OPT_JOB_CSS_LIGHT, trim($jobCssLight));
         $jobCssDark = qa_post_text('smp_job_css_dark') ?? '';
-        qa_opt(SmpConstants::OPT_JOB_CSS_DARK, trim($jobCssDark));
+        SmpSettings::opt(SmpConstants::OPT_JOB_CSS_DARK, trim($jobCssDark));
         $jobTemplate = qa_post_text('smp_job_template') ?? '';
-        qa_opt(SmpConstants::OPT_JOB_TEMPLATE, trim($jobTemplate));
+        SmpSettings::opt(SmpConstants::OPT_JOB_TEMPLATE, trim($jobTemplate));
     }
 
     private function saveDailySettings(): void

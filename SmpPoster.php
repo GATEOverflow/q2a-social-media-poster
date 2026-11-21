@@ -1461,7 +1461,7 @@ class SmpPoster
      */
     public function getRecentPosts(string $contentType): array
     {
-        $list = json_decode(qa_opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType) ?: '[]', true);
+        $list = json_decode(SmpSettings::opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType) ?: '[]', true);
         return is_array($list) ? $list : [];
     }
 
@@ -1470,7 +1470,7 @@ class SmpPoster
         $list = $this->getRecentPosts($contentType);
         array_unshift($list, ['text' => mb_substr($text, 0, 280), 'angle' => $angle, 'at' => date('Y-m-d H:i')]);
         // Options are stored in a size-limited column, so keep only a short history
-        qa_opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType, json_encode(array_slice($list, 0, 8)));
+        SmpSettings::opt(SmpConstants::OPT_RECENT_POSTS . '_' . $contentType, json_encode(array_slice($list, 0, 8)));
     }
 
     /**
@@ -1969,7 +1969,7 @@ class SmpPoster
     public function checkTokenExpiry(): void
     {
         $platforms = SmpConstants::getPlatforms();
-        $notifiedJson = qa_opt(SmpConstants::OPT_EXPIRY_NOTIFIED);
+        $notifiedJson = SmpSettings::opt(SmpConstants::OPT_EXPIRY_NOTIFIED);
         $notified = !empty($notifiedJson) ? json_decode($notifiedJson, true) : [];
         if (!is_array($notified)) {
             $notified = [];
@@ -2033,7 +2033,7 @@ class SmpPoster
         }
 
         if ($changed) {
-            qa_opt(SmpConstants::OPT_EXPIRY_NOTIFIED, json_encode($notified));
+            SmpSettings::opt(SmpConstants::OPT_EXPIRY_NOTIFIED, json_encode($notified));
         }
     }
 

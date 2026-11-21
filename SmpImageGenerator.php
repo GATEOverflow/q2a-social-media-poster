@@ -245,17 +245,17 @@ class SmpImageGenerator
         $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
 
         if ($style === 'dark') {
-            $customCss = qa_opt(SmpConstants::OPT_IMAGE_CSS_DARK);
+            $customCss = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_DARK);
             $css = !empty(trim($customCss ?? '')) ? $customCss : $this->getQotdCssDark();
         } else {
-            $customCss = qa_opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
+            $customCss = SmpSettings::opt(SmpConstants::OPT_IMAGE_CSS_LIGHT);
             $css = !empty(trim($customCss ?? '')) ? $customCss : $this->getQotdCssLight();
         }
         $css = str_replace(['{{WIDTH}}', '{{HEIGHT}}'], [$w, $h], $css);
         // Force-hide .katex-mathml (wkhtmltoimage's old WebKit doesn't support clip:rect)
         $css .= "\n.katex-mathml{display:none!important}\n";
 
-        $customTemplate = qa_opt(SmpConstants::OPT_IMAGE_TEMPLATE);
+        $customTemplate = SmpSettings::opt(SmpConstants::OPT_IMAGE_TEMPLATE);
         if (!empty(trim($customTemplate ?? ''))) {
             $template = $customTemplate;
         } else {
@@ -420,18 +420,18 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:#0f172a;font-family:"Segoe
      */
     private function buildFromTemplate(string $templateOpt, string $cssLightOpt, string $cssDarkOpt, string $defaultTemplate, string $defaultCssLight, string $defaultCssDark, array $replacements): string
     {
-        $template = qa_opt($templateOpt);
+        $template = SmpSettings::opt($templateOpt);
         if (empty(trim($template ?? ''))) {
             $template = $defaultTemplate;
         }
         $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
         if ($style === 'dark') {
-            $css = qa_opt($cssDarkOpt);
+            $css = SmpSettings::opt($cssDarkOpt);
             if (empty(trim($css ?? ''))) {
                 $css = $defaultCssDark;
             }
         } else {
-            $css = qa_opt($cssLightOpt);
+            $css = SmpSettings::opt($cssLightOpt);
             if (empty(trim($css ?? ''))) {
                 $css = $defaultCssLight;
             }
