@@ -1631,10 +1631,16 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
             if (is_string($r)) {
                 $lines[] = $r;
             } else {
-                $line = ($r['platform'] ?? '') . ' / ' . ($r['account'] ?? '') . ': ' . ($r['status'] ?? '');
-                if (!empty($r['new_expiry'])) $line .= ' (new expiry: ' . $r['new_expiry'] . ')';
-                if (!empty($r['error'])) $line .= ' — ' . $r['error'];
-                if (!empty($r['reason'])) $line .= ' — ' . $r['reason'];
+                $status = $r['status'] ?? '';
+                $prefix = ($r['platform'] ?? '') . ' / ' . ($r['account'] ?? '') . ': ';
+                if ($status === 'no_change') {
+                    $line = $prefix . 'WARNING — ' . ($r['reason'] ?? 'Token could not be extended.');
+                } else {
+                    $line = $prefix . $status;
+                    if (!empty($r['new_expiry'])) $line .= ' (new expiry: ' . $r['new_expiry'] . ')';
+                    if (!empty($r['error'])) $line .= ' — ' . $r['error'];
+                    if (!empty($r['reason'])) $line .= ' — ' . $r['reason'];
+                }
                 $lines[] = $line;
             }
         }

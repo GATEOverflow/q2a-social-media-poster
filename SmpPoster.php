@@ -1638,15 +1638,17 @@ class SmpPoster
      */
     private function probeTokenExpiry(string $platform, array $creds): ?string
     {
+        $metaAppId = qa_opt('smp_meta_app_id') ?: '';
+        $metaAppSecret = qa_opt('smp_meta_app_secret') ?: '';
         switch ($platform) {
             case SmpConstants::PLATFORM_FACEBOOK:
-                return $this->probeMetaTokenExpiry($creds['page_access_token'] ?? '');
+                return $this->probeMetaTokenExpiry($creds['page_access_token'] ?? '', $metaAppId, $metaAppSecret);
 
             case SmpConstants::PLATFORM_INSTAGRAM:
-                return $this->probeMetaTokenExpiry($creds['access_token'] ?? '');
+                return $this->probeMetaTokenExpiry($creds['access_token'] ?? '', $metaAppId, $metaAppSecret);
 
             case SmpConstants::PLATFORM_WHATSAPP:
-                return $this->probeMetaTokenExpiry($creds['access_token'] ?? '');
+                return $this->probeMetaTokenExpiry($creds['access_token'] ?? '', $metaAppId, $metaAppSecret);
 
             case SmpConstants::PLATFORM_LINKEDIN:
                 // If OAuth credentials are available, try a refresh to validate
@@ -1682,14 +1684,16 @@ class SmpPoster
      *
      * @return string|null YYYY-MM-DD or null
      */
-    private function probeMetaTokenExpiry(string $accessToken): ?string
+    private function probeMetaTokenExpiry(string $accessToken, string $appId = '', string $appSecret = ''): ?string
     {
         if (empty($accessToken)) {
             return null;
         }
 
+        // Meta requires an app access token (app_id|app_secret) for accurate debug_token results
+        $appAccessToken = (!empty($appId) && !empty($appSecret)) ? ($appId . '|' . $appSecret) : $accessToken;
         $url = 'https://graph.facebook.com/debug_token?'
-            . http_build_query(['input_token' => $accessToken, 'access_token' => $accessToken]);
+            . http_build_query(['input_token' => $accessToken, 'access_token' => $appAccessToken]);
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -1709,6 +1713,10 @@ class SmpPoster
         }
 
         $tokenData = $data['data'];
+
+        if (isset($tokenData['is_valid']) && !$tokenData['is_valid']) {
+            return 'invalid';
+        }
 
         // data_access_expires_at is the stricter limit for data access
         // expires_at is when the token itself expires
@@ -2012,20 +2020,35 @@ class SmpPoster
 
                     if ($refreshResult['success']) {
                         $newToken = $refreshResult['access_token'];
+                        // Probe actual expiry using app access token for accurate debug_token results
+                        $probedExpiry = $this->probeMetaTokenExpiry($newToken, $appId, $appSecret);
+                        $newExpiry = $probedExpiry ?? date('Y-m-d', time() + ($refreshResult['expires_in'] ?? 5184000));
+
+                        $tokenChanged = ($newToken !== $currentToken);
+                        $expiryChanged = ($newExpiry !== $expiryDate);
+
                         $account['credentials'][$tokenField] = $newToken;
-                        // Probe actual expiry from Meta API; fall back to expires_in if unavailable
-                        $probedExpiry = $this->probeMetaTokenExpiry($newToken);
-                        $account['token_expiry_date'] = $probedExpiry ?? date('Y-m-d', time() + ($refreshResult['expires_in'] ?? 5184000));
+                        $account['token_expiry_date'] = $newExpiry;
                         $account['token_expiry_source'] = 'auto-refresh';
                         $account['token_last_refreshed'] = date('Y-m-d H:i:s');
                         $accountsChanged = true;
 
-                        $results[$platformId . '_' . $idx] = [
-                            'platform' => $platformId,
-                            'account' => $accountName,
-                            'status' => 'refreshed',
-                            'new_expiry' => $account['token_expiry_date'],
-                        ];
+                        if (!$tokenChanged && !$expiryChanged) {
+                            // Meta returned the same token unchanged — token cannot be extended this way
+                            $results[$platformId . '_' . $idx] = [
+                                'platform' => $platformId,
+                                'account' => $accountName,
+                                'status' => 'no_change',
+                                'reason' => 'Meta returned the same token with the same expiry (' . $newExpiry . '). Re-authentication required to extend beyond this date.',
+                            ];
+                        } else {
+                            $results[$platformId . '_' . $idx] = [
+                                'platform' => $platformId,
+                                'account' => $accountName,
+                                'status' => 'refreshed',
+                                'new_expiry' => $newExpiry,
+                            ];
+                        }
                     } else {
                         $results[$platformId . '_' . $idx] = [
                             'platform' => $platformId,
