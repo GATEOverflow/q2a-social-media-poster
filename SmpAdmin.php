@@ -66,6 +66,22 @@ class SmpAdmin
             $queries[] = 'INSERT IGNORE INTO ^smp_settings (title, content) SELECT title, content FROM ^options WHERE ' . $moved;
             $queries[] = 'DELETE FROM ^options WHERE ' . $moved;
         }
+        if (!in_array(qa_db_add_table_prefix('smp_quote_library'), $tableslc)) {
+            $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_quote_library ('
+                . '`id` INT UNSIGNED NOT NULL AUTO_INCREMENT, '
+                . '`qhash` CHAR(32) NOT NULL, '
+                . '`quote` TEXT NOT NULL, '
+                . '`author` VARCHAR(120) NOT NULL, '
+                . '`last_posted` DATE DEFAULT NULL, '
+                . 'PRIMARY KEY (`id`), UNIQUE KEY `qhash` (`qhash`), KEY `last_posted` (`last_posted`)'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+        }
+        if (!in_array(qa_db_add_table_prefix('smp_quote_history'), $tableslc)) {
+            $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_quote_history ('
+                . '`qhash` CHAR(32) NOT NULL PRIMARY KEY, '
+                . '`last_posted` DATE NOT NULL'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+        }
         return $queries;
     }
 
@@ -139,14 +155,14 @@ class SmpAdmin
             require_once $this->directory . 'SmpPoster.php';
             $poster = new SmpPoster($this->directory);
             $startDate = qa_post_text('smp_quote_bank_start') ?: date('Y-m-d');
-            $count = max(10, min(200, (int)(qa_post_text('smp_quote_bank_count') ?: 100)));
-            $bank = $poster->generateQuoteBank($startDate, $count);
-            if (!empty($bank)) {
+            $count = max(10, min(500, (int)(qa_post_text('smp_quote_bank_count') ?: 500)));
+            $bank = $poster->buildQuoteBankFromLibrary($startDate, $count);
+            if (count($bank) === $count) {
                 $poster->saveQuoteBank($bank);
-                $message = count($bank) . ' quotes generated starting from ' . htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8') . '.';
+                $message = count($bank) . ' unique library quotes scheduled starting from ' . htmlspecialchars($startDate, ENT_QUOTES, 'UTF-8') . '.';
                 $saved = true;
             } else {
-                $message = 'Failed to generate quotes. Check your OpenAI API key.';
+                $message = 'Not enough eligible unique library quotes for that date range; the existing bank was left unchanged.';
             }
         }
         if (qa_clicked('smp_replace_quote')) {
@@ -154,13 +170,11 @@ class SmpAdmin
             $poster = new SmpPoster($this->directory);
             $replaceId = (int)qa_post_text('smp_replace_quote_id');
             if ($replaceId > 0) {
-                $newQuote = $poster->generateSingleQuote();
-                if ($newQuote) {
-                    $poster->replaceQuoteById($replaceId, $newQuote);
+                if ($poster->replacePendingQuoteFromLibrary($replaceId)) {
                     $message = 'Quote #' . $replaceId . ' replaced.';
                     $saved = true;
                 } else {
-                    $message = 'Failed to generate replacement quote.';
+                    $message = 'No library quote is eligible yet; the 500-day gap is being preserved.';
                 }
             }
         }
@@ -2519,8 +2533,9 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
         $bank = $poster->getQuoteBank();
 
         $today = date('Y-m-d');
-        $defaultStart = empty($bank) ? $today : $today;
+        $defaultStart = date('Y-m-d', strtotime('+1 day'));
         $totalQuotes = count($bank);
+        $libraryCount = $poster->syncQuoteLibrary();
         $pendingCount = 0;
         $postedCount = 0;
         foreach ($bank as $entry) {
@@ -2558,16 +2573,17 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
         </style>';
 
         $html .= '<div class="sqb-wrap">';
+        $html .= '<p>' . (int)$libraryCount . ' unique quotes in the library. Each quote is held out for ' . SmpPoster::QUOTE_GAP_DAYS . ' full days after use.</p>';
 
         // Generate controls
         $html .= '<div class="sqb-gen-row">';
         $html .= '<label>Start date:</label>';
         $html .= '<input type="date" name="smp_quote_bank_start" value="' . htmlspecialchars($defaultStart, ENT_QUOTES, 'UTF-8') . '">';
         $html .= '<label>Count:</label>';
-        $html .= '<input type="number" name="smp_quote_bank_count" value="100" min="10" max="200" style="width:70px">';
+        $html .= '<input type="number" name="smp_quote_bank_count" value="500" min="10" max="500" style="width:70px">';
         $html .= '<button type="submit" name="smp_generate_quote_bank" class="sqb-gen-btn" ';
-        $html .= 'onclick="return confirm(\'This will replace ALL existing quotes in the bank. Continue?\')">';
-        $html .= 'Generate Quote Bank</button>';
+        $html .= 'onclick="return confirm(\'This replaces pending quotes only. Posted history is preserved. Continue?\')">';
+        $html .= 'Schedule Library Quotes</button>';
         $html .= '</div>';
 
         if ($totalQuotes > 0) {

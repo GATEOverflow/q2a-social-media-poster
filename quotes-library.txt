@@ -1,0 +1,659 @@
+# Quote of the Day library: one quote per line as  text | author
+# Lines starting with # are ignored. Duplicates (same words) are skipped on import.
+
+We can only see a short distance ahead, but we can see plenty there that needs to be done. | Alan Turing
+Simplicity is prerequisite for reliability. | Edsger W. Dijkstra
+Program testing can be used to show the presence of bugs, but never to show their absence. | Edsger W. Dijkstra
+The question of whether a computer can think is no more interesting than the question of whether a submarine can swim. | Edsger W. Dijkstra
+Beware of bugs in the above code; I have only proved it correct, not tried it. | Donald Knuth
+An algorithm must be seen to be believed. | Donald Knuth
+Science is what we understand well enough to explain to a computer. Art is everything else we do. | Donald Knuth
+Premature optimization is the root of all evil. | Donald Knuth
+Computers are good at following instructions, but not at reading your mind. | Donald Knuth
+Programs must be written for people to read, and only incidentally for machines to execute. | Harold Abelson
+Controlling complexity is the essence of computer programming. | Brian Kernighan
+Everyone knows that debugging is twice as hard as writing a program in the first place. So if you're as clever as you can be when you write it, how will you ever debug it? | Brian Kernighan
+Talk is cheap. Show me the code. | Linus Torvalds
+Bad programmers worry about the code. Good programmers worry about data structures and their relationships. | Linus Torvalds
+The best way to predict the future is to invent it. | Alan Kay
+Simple things should be simple, complex things should be possible. | Alan Kay
+Any fool can write code that a computer can understand. Good programmers write code that humans can understand. | Martin Fowler
+There are two ways of constructing a software design: make it so simple that there are obviously no deficiencies, or so complicated that there are no obvious deficiencies. | C. A. R. Hoare
+Inside every large program is a small program struggling to get out. | C. A. R. Hoare
+The most dangerous phrase in the language is: we've always done it this way. | Grace Hopper
+A ship in port is safe, but that's not what ships are built for. | Grace Hopper
+The function of good software is to make the complex appear to be simple. | Grady Booch
+Make it work, make it right, make it fast. | Kent Beck
+Optimism is an occupational hazard of programming; feedback is the treatment. | Kent Beck
+Fools ignore complexity. Pragmatists suffer it. Some can avoid it. Geniuses remove it. | Alan Perlis
+A language that doesn't affect the way you think about programming is not worth knowing. | Alan Perlis
+Simplicity does not precede complexity, but follows it. | Alan Perlis
+One of my most productive days was throwing away 1000 lines of code. | Ken Thompson
+When in doubt, use brute force. | Ken Thompson
+To iterate is human, to recurse divine. | L. Peter Deutsch
+There are only two hard things in Computer Science: cache invalidation and naming things. | Phil Karlton
+In theory, there is no difference between theory and practice. In practice, there is. | Jan L. A. van de Snepscheut
+The only way to learn a new programming language is by writing programs in it. | Dennis Ritchie
+The cheapest, fastest, and most reliable components are those that aren't there. | Gordon Bell
+The purpose of computing is insight, not numbers. | Richard Hamming
+If you don't work on important problems, it's not likely that you'll do important work. | Richard Hamming
+The first principle is that you must not fool yourself, and you are the easiest person to fool. | Richard Feynman
+What I cannot create, I do not understand. | Richard Feynman
+Study hard what interests you the most in the most undisciplined, irreverent and original manner possible. | Richard Feynman
+I have no special talents. I am only passionately curious. | Albert Einstein
+The important thing is not to stop questioning. | Albert Einstein
+Strive not to be a success, but rather to be of value. | Albert Einstein
+Pure mathematics is, in its way, the poetry of logical ideas. | Albert Einstein
+If I have seen further it is by standing on the shoulders of giants. | Isaac Newton
+Nothing in life is to be feared, it is only to be understood. | Marie Curie
+It is by logic that we prove, but by intuition that we discover. | Henri Poincaré
+Mathematics is the art of giving the same name to different things. | Henri Poincaré
+In mathematics you don't understand things. You just get used to them. | John von Neumann
+If people do not believe that mathematics is simple, it is only because they do not realize how complicated life is. | John von Neumann
+An expert is a person who has made all the mistakes that can be made in a very narrow field. | Niels Bohr
+Genius is one percent inspiration and ninety-nine percent perspiration. | Thomas Edison
+Chance favours only the prepared mind. | Louis Pasteur
+Research is to see what everybody else has seen, and to think what nobody else has thought. | Albert Szent-Györgyi
+Mathematics is the queen of the sciences. | Carl Friedrich Gauss
+It is not knowledge, but the act of learning, which grants the greatest enjoyment. | Carl Friedrich Gauss
+Divide each difficulty into as many parts as is feasible and necessary to resolve it. | René Descartes
+Read Euler, read Euler, he is the master of us all. | Pierre-Simon Laplace
+God made the integers, all else is the work of man. | Leopold Kronecker
+Mathematics is not about numbers, equations, computations, or algorithms: it is about understanding. | William Thurston
+The art of doing mathematics consists in finding that special case which contains all the germs of generality. | David Hilbert
+We must know. We will know. | David Hilbert
+A mathematician who is not also something of a poet will never be a complete mathematician. | Karl Weierstrass
+Science is a way of thinking much more than it is a body of knowledge. | Carl Sagan
+Extraordinary claims require extraordinary evidence. | Carl Sagan
+Arise, awake, and stop not till the goal is reached. | Swami Vivekananda
+Take up one idea. Make that one idea your life; think of it, dream of it, live on that idea. | Swami Vivekananda
+You have to dream before your dreams can come true. | A. P. J. Abdul Kalam
+If you want to shine like a sun, first burn like a sun. | A. P. J. Abdul Kalam
+Excellence is a continuous process and not an accident. | A. P. J. Abdul Kalam
+We are what we repeatedly do. Excellence, then, is not an act, but a habit. | Will Durant
+Well done is better than well said. | Benjamin Franklin
+Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away. | Antoine de Saint-Exupéry
+Success is the sum of small efforts, repeated day in and day out. | Robert Collier
+Opportunities multiply as they are seized. | Sun Tzu
+Victorious warriors win first and then go to war, while defeated warriors go to war first and then seek to win. | Sun Tzu
+The journey of a thousand miles begins with a single step. | Lao Tzu
+Do the difficult things while they are easy and do the great things while they are small. | Lao Tzu
+Knowing is not enough; we must apply. Willing is not enough; we must do. | Johann Wolfgang von Goethe
+I am always doing that which I cannot do, in order that I may learn how to do it. | Pablo Picasso
+Amateurs sit and wait for inspiration, the rest of us just get up and go to work. | Stephen King
+Learning is not attained by chance; it must be sought for with ardor and attended to with diligence. | Abigail Adams
+The beautiful thing about learning is that nobody can take it away from you. | B. B. King
+Failure is simply the opportunity to begin again, this time more intelligently. | Henry Ford
+Whether you think you can, or you think you can't, you're right. | Henry Ford
+It's not whether you get knocked down, it's whether you get up. | Vince Lombardi
+Practice does not make perfect. Only perfect practice makes perfect. | Vince Lombardi
+Hard work beats talent when talent doesn't work hard. | Tim Notke
+You miss 100% of the shots you don't take. | Wayne Gretzky
+Don't count the days, make the days count. | Muhammad Ali
+I hated every minute of training, but I said: don't quit, suffer now and live the rest of your life as a champion. | Muhammad Ali
+The best time to plant a tree was 20 years ago. The second best time is now. | Chinese proverb
+Fall seven times, stand up eight. | Japanese proverb
+A smooth sea never made a skilled sailor. | English proverb
+
+# ---- Consistency and habits ----
+Two focused hours every day beat a twelve-hour Sunday that you never repeat. | GATE Overflow
+Motivation gets you to the desk. Habit keeps you there on the days motivation doesn't show up. | GATE Overflow
+Do not break the chain: one solved problem today keeps tomorrow's start easy. | GATE Overflow
+The syllabus is finished one topic at a time, not one resolution at a time. | GATE Overflow
+Consistency is compound interest for your brain. Small daily deposits, huge final balance. | GATE Overflow
+A timetable you follow for 80% of days beats a perfect one you abandon in a week. | GATE Overflow
+Start before you feel ready. Readiness is a result of starting, not a condition for it. | GATE Overflow
+Your rank is decided on the ordinary days, not the exam day. | GATE Overflow
+Show up even on bad days. A bad day of study still moves the needle. | GATE Overflow
+The secret of finishing the syllabus is boring: same time, same place, every day. | GATE Overflow
+Every expert you admire once had a day one. Today can be yours. | GATE Overflow
+Discipline is remembering what you want when you don't feel like working for it. | GATE Overflow
+Small wins stack. Solve one more question than yesterday. | GATE Overflow
+Don't wait for Monday. The best day to restart is the one you're in. | GATE Overflow
+You don't need more hours; you need fewer wasted ones. | GATE Overflow
+Plan the week on Sunday, then just execute the plan each day. Decisions drain energy. | GATE Overflow
+Progress hides in the daily log. Write down what you studied, and watch it add up. | GATE Overflow
+A streak of thirty steady days will teach you more about yourself than any motivational video. | GATE Overflow
+If you missed a day, don't miss two. That is the whole rule. | GATE Overflow
+The hardest part of a study session is the first five minutes. Just begin. | GATE Overflow
+Routine is not a cage; it frees your mind to focus on the problem in front of you. | GATE Overflow
+Effort compounds silently for months and then shows up all at once in the result. | GATE Overflow
+One chapter a day is thirty chapters a month. Quietly, that is the whole syllabus. | GATE Overflow
+Set a study start time like an exam start time. Non-negotiable. | GATE Overflow
+The aspirant who keeps going after the initial excitement fades is the one who cracks it. | GATE Overflow
+Make the right action easy: keep the notebook open and the phone in another room. | GATE Overflow
+A long preparation is won by pacing, not sprinting. | GATE Overflow
+Keep a daily target small enough that you never skip it and big enough that it matters. | GATE Overflow
+Today's effort is a message to your future self: I did not give up on you. | GATE Overflow
+Don't measure the day by how you felt. Measure it by what you finished. | GATE Overflow
+
+# ---- Practice and problem solving ----
+Reading a solution is not the same as solving the problem. Close the answer and try again. | GATE Overflow
+Struggle with a problem for twenty minutes before you look at the hint. That struggle is the learning. | GATE Overflow
+You understand a concept only when you can solve a question you have never seen on it. | GATE Overflow
+Write the steps. Most silly mistakes live in the steps you did in your head. | GATE Overflow
+Solve the question first, then ask whether there was a faster way. Both lessons matter. | GATE Overflow
+A wrong attempt that you analyse teaches more than a right answer you guessed. | GATE Overflow
+When stuck, try a tiny example. n = 1, 2, 3 has cracked more GATE questions than any formula. | GATE Overflow
+Every problem you solve today is one less surprise on exam day. | GATE Overflow
+Practice the questions you avoid. That is where your marks are hiding. | GATE Overflow
+Don't just count questions solved; count concepts you can now explain. | GATE Overflow
+Work on the edge of your ability. Too easy is a waste; too hard is a wall. Find the stretch. | GATE Overflow
+Speed comes from clarity, and clarity comes from solving slowly first. | GATE Overflow
+Try to break your own answer. If you can't, you have probably got it right. | GATE Overflow
+Change one condition of a solved question and solve it again. That is how depth is built. | GATE Overflow
+The best practice question is the one that makes you uncomfortable. | GATE Overflow
+Draw it. Trees, graphs, timelines and tables turn confusing questions into obvious ones. | GATE Overflow
+If a problem feels impossible, it is usually two easy problems glued together. Split it. | GATE Overflow
+Check units, check bounds, check the extreme case. Three seconds that save marks. | GATE Overflow
+Learn the method, not the answer. Answers don't repeat; methods do. | GATE Overflow
+Solving one question three ways beats solving three questions one way. | GATE Overflow
+When an answer feels too easy, reread the question. GATE loves the word "not". | GATE Overflow
+Make friends with counter-examples. One is enough to kill a wrong option. | GATE Overflow
+Hard problems are not a sign you're bad at the subject; they're a sign you've reached the interesting part. | GATE Overflow
+Think before you compute. Many numerical answers need just one clever observation. | GATE Overflow
+The goal of practice is not to get it right once, but to stop getting it wrong. | GATE Overflow
+Elimination is a valid strategy. Removing three wrong options is also problem solving. | GATE Overflow
+Treat every question as a puzzle the setter built for you. Find the idea they hid. | GATE Overflow
+A good question stays with you after you solve it. Revisit those. | GATE Overflow
+If you can predict roughly what the answer should be, you can catch your own mistakes. | GATE Overflow
+Solve under a timer once a week. Knowing is half the job; recalling quickly is the other half. | GATE Overflow
+
+# ---- Previous year questions ----
+Previous year questions are the syllabus written in the examiner's own handwriting. | GATE Overflow
+Solve every PYQ of a topic before calling that topic done. | GATE Overflow
+Old GATE questions teach you what the examiner thinks is important. Listen to them. | GATE Overflow
+Don't just solve a PYQ; read the discussion. Someone always found a better way. | GATE Overflow
+PYQs repeat ideas, not numbers. Learn the idea behind each one. | GATE Overflow
+A topic with many PYQs is a topic worth mastering, not just covering. | GATE Overflow
+Go back to the PYQs you got wrong a month later. If you still get them wrong, the concept is not fixed yet. | GATE Overflow
+Solving PYQs topic-wise builds understanding; solving them paper-wise builds exam temperament. Do both. | GATE Overflow
+The best mock test ever written is a real past GATE paper. | GATE Overflow
+Every PYQ you understand deeply is worth ten random practice questions. | GATE Overflow
+Old papers show you the traps. Memorise the traps, not the answers. | GATE Overflow
+When a PYQ answer is disputed, work it out yourself. That argument will teach you the topic. | GATE Overflow
+
+# ---- Concepts and understanding ----
+If you can't explain it simply, you don't understand it well enough yet. Keep going. | GATE Overflow
+Memorised formulas fade. Understood derivations stay. | GATE Overflow
+Ask "why" one more time than feels necessary. | GATE Overflow
+Definitions are not boring; most tricky questions are just definitions read carefully. | GATE Overflow
+A concept is learned when you can teach it, test it, and apply it to a new case. | GATE Overflow
+Build the foundation first. Advanced topics are just basics stacked carefully. | GATE Overflow
+Confusion is the feeling of your brain reorganising. Stay with it a little longer. | GATE Overflow
+Learn each topic till it feels obvious. Obvious is what you can do under exam pressure. | GATE Overflow
+Standard textbooks are slow to read and quick to pay back. | GATE Overflow
+Notes in your own words are worth more than perfect notes copied from someone else. | GATE Overflow
+Connect topics. The pumping lemma, pigeonholes and hashing are all about running out of room. | GATE Overflow
+Understanding is the shortcut you are looking for. | GATE Overflow
+Every formula has a story. Learn the story, and the formula writes itself. | GATE Overflow
+When two topics seem unrelated, look for the common idea. That is where insight lives. | GATE Overflow
+If a concept feels shaky, go one level more basic and rebuild from there. | GATE Overflow
+Read the question as the examiner wrote it, not as you expected it to be. | GATE Overflow
+Precision matters: "at most", "exactly" and "at least" are three different questions. | GATE Overflow
+The proof is not decoration. It tells you exactly when the theorem stops working. | GATE Overflow
+A good diagram is worth a page of notes. | GATE Overflow
+Curiosity turns a syllabus into a subject. | GATE Overflow
+
+# ---- Revision and memory ----
+What you don't revise, you rent. Revision is how you own it. | GATE Overflow
+Revise within a day, then within a week, then within a month. Memory loves spaced repetition. | GATE Overflow
+Short notes are for the last month. Make them in the first month. | GATE Overflow
+Test yourself instead of rereading. Recall builds memory; rereading builds false confidence. | GATE Overflow
+The forgetting curve is real. Beat it with scheduled revision, not with guilt. | GATE Overflow
+A formula sheet you wrote yourself is the best revision book you will ever own. | GATE Overflow
+Revision is not repetition; it is the second chance to understand what you missed. | GATE Overflow
+Revise your mistakes before you revise your strengths. | GATE Overflow
+One revision day a week keeps the first chapter alive when you reach the last. | GATE Overflow
+If a topic feels new during revision, it was never learned. Relearn it properly. | GATE Overflow
+Close the book and write everything you remember. The gaps tell you what to revise. | GATE Overflow
+Revision makes speed. Speed makes time. Time makes marks. | GATE Overflow
+Old topics are not finished topics. Visit them like old friends. | GATE Overflow
+The last month is for polishing, not for learning new chapters. Plan for that. | GATE Overflow
+Spaced revision beats long marathon sessions every single time. | GATE Overflow
+
+# ---- Mock tests and exam strategy ----
+A mock test is a rehearsal. Make your mistakes there, not on exam day. | GATE Overflow
+The score of a mock matters less than the analysis after it. | GATE Overflow
+Spend as long analysing a mock as you spent writing it. | GATE Overflow
+Attempt order matters: harvest the easy marks first, then fight for the hard ones. | GATE Overflow
+Negative marking punishes guessing, not attempting. Attempt what you can reason about. | GATE Overflow
+Know when to leave a question. Pride costs more marks than ignorance. | GATE Overflow
+Read all options before you commit. The second-best option is designed to look right. | GATE Overflow
+For numerical answers, double check the rounding and the units before you submit. | GATE Overflow
+Simulate the exam: same time slot, same duration, no breaks. Train your brain for the real clock. | GATE Overflow
+Keep an error log after every mock: topic, mistake type, fix. Patterns will appear. | GATE Overflow
+Low mock scores are data, not destiny. | GATE Overflow
+Your target is not to know everything; it is to score well on what is asked. | GATE Overflow
+General Aptitude is fifteen marks that reward calm reading. Don't leave them for last-minute panic. | GATE Overflow
+Marks lost to silly mistakes are the easiest marks to win back. | GATE Overflow
+Mark questions to revisit and move on. Momentum is a resource. | GATE Overflow
+A calm mind solves faster than a fast hand. | GATE Overflow
+Practise with the virtual calculator before the exam, not during it. | GATE Overflow
+Every mock you take makes the real exam a little more familiar and a little less scary. | GATE Overflow
+Don't compare your mock score with others; compare it with your last one. | GATE Overflow
+The paper is not out to get you. It is testing basics in clever clothes. | GATE Overflow
+
+# ---- Mistakes, failure and resilience ----
+A mistake you understand is a mark you won't lose again. | GATE Overflow
+Failure in a mock is cheap. Failure to learn from it is expensive. | GATE Overflow
+You are allowed to be frustrated. You are not allowed to quit. | GATE Overflow
+Every topper has a pile of wrong answers behind them. They just learned from each one. | GATE Overflow
+One bad test does not define a year of preparation. | GATE Overflow
+Setbacks are part of the plan. Recovery is the skill. | GATE Overflow
+If the last attempt didn't work, change the method, not the goal. | GATE Overflow
+The comeback is built in the quiet weeks after a disappointment. | GATE Overflow
+You don't need to be fearless. You need to keep going while afraid. | GATE Overflow
+Doubt is loud. Progress is quiet. Listen to the progress. | GATE Overflow
+Repeat attempts are not a sign of failure; they are a sign of persistence. | GATE Overflow
+Every wrong answer narrows the path to the right one. | GATE Overflow
+Feel the disappointment for a day, then turn it into a plan. | GATE Overflow
+A bad day is just a day. Tomorrow resets the counter. | GATE Overflow
+Mistakes are proof that you are attempting. Keep attempting. | GATE Overflow
+The goal is not to never fall; it is to get up faster each time. | GATE Overflow
+What feels like a wall today will look like a step a month from now. | GATE Overflow
+You are not behind. You are on your own timeline. Keep moving on it. | GATE Overflow
+Turn "I can't do this" into "I can't do this yet". | GATE Overflow
+Resilience is a muscle. Every hard week you finish makes it stronger. | GATE Overflow
+
+# ---- Focus and distraction ----
+Your phone is the most effective competitor you will ever face. Put it in another room. | GATE Overflow
+Deep work for ninety minutes beats a distracted afternoon. | GATE Overflow
+Multitasking while studying is just switching badly between tasks. | GATE Overflow
+Close the extra tabs. One problem, one page, one mind. | GATE Overflow
+Notifications are other people's priorities. Silence them while you study. | GATE Overflow
+Focus is not about doing more; it is about ignoring more. | GATE Overflow
+Every time you resist a distraction, the next one gets easier to resist. | GATE Overflow
+Study in blocks with real breaks. A tired mind reads the same line five times. | GATE Overflow
+Make your study space boring. Boring spaces produce interesting results. | GATE Overflow
+Scrolling feels like rest but leaves you more tired. Take a walk instead. | GATE Overflow
+The world will still be there after your study session. Your concentration may not be if you check it now. | GATE Overflow
+Protect your mornings; they are often your sharpest hours. | GATE Overflow
+Attention is the real currency of preparation. Spend it carefully. | GATE Overflow
+When your mind wanders, write the thought down and return to the problem. | GATE Overflow
+A focused hour of algorithms is worth three hours of half-watching lectures. | GATE Overflow
+
+# ---- Time management ----
+Plan the day the night before. Mornings are for doing, not deciding. | GATE Overflow
+Big topics shrink when you break them into daily sub-goals. | GATE Overflow
+Give the hard subject your best hours, not your leftover hours. | GATE Overflow
+A weekly review of your plan is how you catch a slipping schedule early. | GATE Overflow
+Estimate, then track. Most of us underestimate how long topics take. | GATE Overflow
+Don't spend a week making the perfect plan. Spend a day, then start. | GATE Overflow
+Leave buffer days in your schedule. Life will use them. | GATE Overflow
+Finish the high-weightage topics first, then go deep where you are strong. | GATE Overflow
+Watching lectures at 2x is not the same as learning at 2x. | GATE Overflow
+The best time to start revision is earlier than you think. | GATE Overflow
+Work in sprints: decide, study, test, review. Then repeat. | GATE Overflow
+Say no to things that don't move your preparation forward, at least for this season. | GATE Overflow
+Time spent organising notes is useful only until it replaces time spent solving questions. | GATE Overflow
+A finished plan with gaps beats an unfinished perfect plan. | GATE Overflow
+When the syllabus feels endless, ask: what is the next single thing to do? | GATE Overflow
+
+# ---- Health and balance ----
+Sleep is when your brain files today's learning. Don't skip it. | GATE Overflow
+A tired brain makes silly mistakes. Rest is part of preparation. | GATE Overflow
+Move your body every day. A short walk refreshes attention better than coffee. | GATE Overflow
+Drink water, eat on time, sleep enough. Boring advice, real marks. | GATE Overflow
+Burnout is not a badge of honour. Sustainable effort wins long races. | GATE Overflow
+Take one evening off each week. You will come back sharper. | GATE Overflow
+Your health is the hardware your preparation runs on. Maintain it. | GATE Overflow
+Talk to friends and family. Preparation is lonely enough without isolating yourself completely. | GATE Overflow
+Anxiety shrinks when you write down what worries you and what you will do about it. | GATE Overflow
+Breathe slowly before a mock. Calm is a skill you can practise. | GATE Overflow
+Nights before the exam are for sleep, not for new topics. | GATE Overflow
+Be as kind to yourself as you would be to a friend preparing for the same exam. | GATE Overflow
+A short break taken on time prevents a long break taken out of exhaustion. | GATE Overflow
+Your worth is not your score. Prepare hard, and keep perspective. | GATE Overflow
+Sunlight, sleep and a steady routine are underrated study tools. | GATE Overflow
+
+# ---- Confidence and mindset ----
+You don't have to be the smartest in the room. You have to be the most consistent. | GATE Overflow
+Confidence comes from preparation, not from pep talks. | GATE Overflow
+Comparison steals focus. Run your own race. | GATE Overflow
+Everyone starts confused. Some just stay long enough to become clear. | GATE Overflow
+Believe in the work you have put in. It is still there on exam day. | GATE Overflow
+Ability grows with effort. Your brain is not fixed hardware; it is reconfigurable. | GATE Overflow
+You belong in this race as much as anyone else who prepares honestly. | GATE Overflow
+The exam doesn't know where you studied or which college you came from. It only reads your answers. | GATE Overflow
+Impostor syndrome means you are surrounded by learning. That is a good place to be. | GATE Overflow
+Celebrate understanding a hard topic. Those moments are the real milestones. | GATE Overflow
+Doubt the doubt, not the effort. | GATE Overflow
+Your past marks are a starting point, not a ceiling. | GATE Overflow
+Be patient with slow progress. Slow is still progress. | GATE Overflow
+The person who keeps asking questions eventually knows the answers. | GATE Overflow
+You are building a skill, not just preparing for a single morning. | GATE Overflow
+
+# ---- Curiosity and learning ----
+Learn for understanding and the marks will follow; learn only for marks and both may slip away. | GATE Overflow
+Every topic is interesting once you ask the right question about it. | GATE Overflow
+Read beyond the question. Why does this algorithm work, and when would it fail? | GATE Overflow
+Curiosity is the cheapest and most powerful study tool you have. | GATE Overflow
+The best students are the ones who enjoy being wrong for a moment because it means they're about to learn. | GATE Overflow
+Implement what you learn. A sorting algorithm you have coded is a sorting algorithm you remember. | GATE Overflow
+Learn the history of an idea. Knowing why it was invented makes it easier to understand. | GATE Overflow
+Ask the second question: after "how", ask "why this way and not another?" | GATE Overflow
+Knowledge grows when it is shared. Explain a topic to someone this week. | GATE Overflow
+A good question is often more valuable than a good answer. | GATE Overflow
+Learning feels slow while it happens and obvious once it has happened. | GATE Overflow
+Each concept you truly learn makes the next one easier. Learning compounds. | GATE Overflow
+Stay a beginner in spirit: curious, humble and willing to try. | GATE Overflow
+Notice what confuses you. Confusion points exactly to what you need to learn next. | GATE Overflow
+Don't just collect resources. Finish one good resource. | GATE Overflow
+
+# ---- Algorithms and data structures ----
+Life is like Dijkstra's algorithm: always settle the closest thing you can finish, then expand. | GATE Overflow
+Your preparation is a dynamic programming problem: today's work is built on yesterday's solved subproblems. | GATE Overflow
+Be a greedy algorithm with your daily goals and a dynamic programmer with your long-term plan. | GATE Overflow
+Divide and conquer the syllabus: split it until each piece is small enough to master in a day. | GATE Overflow
+Backtrack when a path fails. That is not defeat; it is how search algorithms find answers. | GATE Overflow
+Every recursion needs a base case. Every study plan needs a first step. | GATE Overflow
+Amortised analysis applies to effort too: a few hard days pay for many smooth ones. | GATE Overflow
+A heap always knows its top priority. Do you? | GATE Overflow
+Like binary search, halve your doubt with each question you ask. | GATE Overflow
+Hash your doubts into a notebook so you can look them up in constant time later. | GATE Overflow
+A balanced tree stays fast because it never lets one side grow too tall. Balance your subjects too. | GATE Overflow
+Memoise your mistakes so you never have to compute them again. | GATE Overflow
+The longest common subsequence between toppers is consistency. | GATE Overflow
+Breadth-first through the syllabus first, then depth-first into the hard topics. | GATE Overflow
+A stack remembers the latest; a queue remembers the earliest. Revision needs both. | GATE Overflow
+The minimum spanning tree of preparation: connect every topic with the least wasted effort. | GATE Overflow
+Union-find teaches a life lesson: connect related ideas and you'll find answers faster. | GATE Overflow
+Topological order matters: learn prerequisites before the topics that depend on them. | GATE Overflow
+An O(n log n) habit beats an O(n²) cram. | GATE Overflow
+Like quicksort, pick a good pivot topic each day and everything else falls into place around it. | GATE Overflow
+Even the best algorithm needs correct input. Feed your brain good sources. | GATE Overflow
+The worst case is rare. Prepare for it, but don't live in it. | GATE Overflow
+Don't optimise before it works. First understand, then speed up. | GATE Overflow
+A linked list grows one node at a time. So does your knowledge. | GATE Overflow
+In graph terms, every topic you master adds edges to the topics you know. Soon everything is connected. | GATE Overflow
+Invariants keep algorithms correct. Keep a few for yourself: sleep, revise, practise. | GATE Overflow
+A loop without progress is an infinite loop. Make sure every study session moves something forward. | GATE Overflow
+Greedy works when local choices lead to the global best. Daily consistency is one of those cases. | GATE Overflow
+The master theorem solves recurrences. Patience solves preparation. | GATE Overflow
+Your mistakes are test cases. Run them again until your solution passes all of them. | GATE Overflow
+
+# ---- Operating systems, networks, databases ----
+Avoid deadlock in your plan: never wait on motivation while motivation waits on progress. | GATE Overflow
+Context switching is expensive for CPUs and for students. Finish a topic before jumping. | GATE Overflow
+Schedule your subjects like a fair CPU scheduler: nobody starves, the important ones get priority. | GATE Overflow
+Thrashing happens when you load too many topics at once. Keep your working set small. | GATE Overflow
+A semaphore for your phone: one permit per study block, and it is not yours. | GATE Overflow
+Paging works because of locality. Revise related topics together. | GATE Overflow
+Like TCP, preparation needs acknowledgements: test yourself to confirm the lesson arrived. | GATE Overflow
+Congestion control applies to study too: increase load slowly, back off when you burn out. | GATE Overflow
+Every packet finds its route eventually. So will you, if you keep forwarding. | GATE Overflow
+Normalise your notes: one fact in one place, no redundant copies to keep in sync. | GATE Overflow
+Commit your learning daily. Uncommitted work can be lost in a crash. | GATE Overflow
+ACID for preparation: atomic goals, consistent routine, isolated focus, durable revision. | GATE Overflow
+Indexes make lookups fast. Short notes are the index of your preparation. | GATE Overflow
+A good join needs matching keys. Connect new topics to what you already know. | GATE Overflow
+Write-ahead logging for students: write down what you plan to study before you start. | GATE Overflow
+Critical sections need mutual exclusion. So does your study time. | GATE Overflow
+Caching works because the past predicts the future. Revise what keeps appearing in papers. | GATE Overflow
+Interrupts are fine if handled quickly. Get back to the main task. | GATE Overflow
+Every protocol has a handshake. Start each session by reviewing what you did last time. | GATE Overflow
+The OSI model has seven layers. Understanding has more. Keep peeling. | GATE Overflow
+
+# ---- Theory of computation, compilers, architecture ----
+Some problems are undecidable. Whether you can improve with practice is not one of them. | GATE Overflow
+A DFA has finite memory and still recognises infinite languages. Small daily steps can cover a huge syllabus. | GATE Overflow
+Non-determinism is guessing right every time. Real preparation is deterministic: do the work. | GATE Overflow
+The pumping lemma proves a language is not regular. Persistence proves your doubts wrong. | GATE Overflow
+Every compiler error points at a line. Every wrong answer points at a concept. Read the message. | GATE Overflow
+Parsing is just patience applied to grammar. | GATE Overflow
+A pipeline is fast because every stage keeps working. Keep each day of your preparation busy too. | GATE Overflow
+Hazards stall pipelines; distractions stall preparation. Forward around them. | GATE Overflow
+Cache hits are cheap, misses are costly. Revise often so recall stays a hit. | GATE Overflow
+Turing machines are simple, yet they compute everything computable. Simple habits can be just as powerful. | GATE Overflow
+Reduction is a superpower: turn the unknown problem into one you already know how to solve. | GATE Overflow
+Halting is undecidable for programs, but you can decide to keep going. | GATE Overflow
+Lexical analysis first, then syntax, then meaning. Read questions in the same order. | GATE Overflow
+Register allocation teaches priority: keep the most-used ideas closest at hand. | GATE Overflow
+Floating point rounds; marks don't. Be precise. | GATE Overflow
+
+# ---- Mathematics and aptitude ----
+Discrete mathematics is not a separate subject; it is the language every other CS subject speaks. | GATE Overflow
+Probability is common sense made precise. Practise until the precision feels like common sense. | GATE Overflow
+In combinatorics, count the same thing two ways. If both agree, you are right. | GATE Overflow
+Linear algebra rewards patterns: learn the properties and the calculations shrink. | GATE Overflow
+Graph theory questions often become easy once you draw the graph. | GATE Overflow
+For aptitude, read the question twice and the options once. | GATE Overflow
+Mathematical induction is just consistency written as a proof: true today, true tomorrow, true forever. | GATE Overflow
+Prove small cases by hand before trusting a formula. | GATE Overflow
+Every logic question is a truth table if you are patient enough. | GATE Overflow
+Set theory is the grammar of mathematics. Learn it well and every proof reads more easily. | GATE Overflow
+Calculus questions in GATE test understanding of limits and change, not long computations. | GATE Overflow
+Expected value is linear even when events are dependent. Remember that and many problems collapse. | GATE Overflow
+Generating functions turn counting into algebra. Learn them once; reuse them often. | GATE Overflow
+Mental math is a muscle. Use the calculator less in practice, and you'll trust yourself more in the exam. | GATE Overflow
+The pigeonhole principle: with enough effort spread over enough days, results have to land somewhere. | GATE Overflow
+
+# ---- Community and asking questions ----
+Asking a doubt is not a weakness. Carrying it to the exam is. | GATE Overflow
+Answer someone else's question today. Teaching is the fastest revision. | GATE Overflow
+Read the discussion on a question even when you got it right. Others see angles you missed. | GATE Overflow
+Write your doubt clearly. Half the time, writing it clearly answers it. | GATE Overflow
+A study group works when everyone comes prepared. Be the one who does. | GATE Overflow
+Respectful disagreement on a solution is how the whole community learns. | GATE Overflow
+Share what worked for you. Someone else is stuck exactly where you were. | GATE Overflow
+Good mentors don't give answers; they give better questions. | GATE Overflow
+Learning alone is possible. Learning together is faster. | GATE Overflow
+Thank the people who explained things to you by explaining things to someone else. | GATE Overflow
+Search before you ask; your question may already have a brilliant answer waiting. | GATE Overflow
+A community is built from small contributions. Add one today. | GATE Overflow
+
+# ---- The long journey ----
+Months of quiet effort become a single result day. Make every one of those months count. | GATE Overflow
+The exam lasts three hours. The preparation lasts much longer. Enjoy the learning in between. | GATE Overflow
+The skills you build for GATE stay with you long after the score card. | GATE Overflow
+Keep the big goal in mind, but put today's small task in front of you. | GATE Overflow
+You will not remember every hard day of preparation. You will remember that you didn't quit. | GATE Overflow
+Patience is not waiting. It is working steadily while results take their time. | GATE Overflow
+Write down why you started. Read it on the days you want to stop. | GATE Overflow
+There is no last-minute magic. There is only the work done over many minutes. | GATE Overflow
+Future you is counting on present you. Don't let them down today. | GATE Overflow
+Success leaves clues: steady schedules, honest analysis, lots of practice. Follow them. | GATE Overflow
+Your effort today is invisible to others and obvious to the result. | GATE Overflow
+Keep going. The view from the end of a long climb is worth the steps. | GATE Overflow
+The goal is a rank; the reward is the engineer you become on the way. | GATE Overflow
+Not every day will feel productive. Add enough of them up and they become a result. | GATE Overflow
+You are closer than you were yesterday. That is all a single day needs to achieve. | GATE Overflow
+
+# ---- Short and sharp ----
+Fewer resources, more revisions. | GATE Overflow
+Concepts first, tricks later. | GATE Overflow
+Practise daily, revise weekly, test monthly. | GATE Overflow
+Slow is smooth. Smooth is fast. | GATE Overflow
+Solve, check, analyse, repeat. | GATE Overflow
+Learn it. Apply it. Teach it. | GATE Overflow
+No zero days. | GATE Overflow
+Understand, don't memorise. | GATE Overflow
+Your desk is your arena. Show up. | GATE Overflow
+Effort today, results tomorrow. | GATE Overflow
+Calm mind, clear answers. | GATE Overflow
+Doubt less, do more. | GATE Overflow
+One topic. Full focus. No phone. | GATE Overflow
+Mistakes are teachers, not judges. | GATE Overflow
+Start small. Stay steady. Finish strong. | GATE Overflow
+Read carefully. Answer confidently. | GATE Overflow
+Progress over perfection. | GATE Overflow
+Fundamentals never go out of syllabus. | GATE Overflow
+Today, just one more question. | GATE Overflow
+Trust the process; verify with mocks. | GATE Overflow
+
+# ---- Subject-specific encouragement ----
+Data structures reward drawing. Sketch every pointer change and the confusion disappears. | GATE Overflow
+For algorithms, always ask: what is the input size, and what does that allow? | GATE Overflow
+Operating systems questions are stories about processes. Trace them step by step. | GATE Overflow
+For computer networks, master the numbers once: header sizes, delays, window sizes. Then they're free marks. | GATE Overflow
+Databases are logic with tables. Normal forms and SQL become simple once keys are clear. | GATE Overflow
+Theory of computation feels abstract until you build the machine on paper. Then it feels like a game. | GATE Overflow
+Compiler design questions are mechanical once you practise the tables. Practise the tables. | GATE Overflow
+Computer organisation is about counting carefully: cycles, bits, addresses. Count slowly and correctly. | GATE Overflow
+Digital logic rewards neat K-maps and patient truth tables. | GATE Overflow
+Programming in C questions test what the code really does, not what it looks like it does. Trace it. | GATE Overflow
+Discrete maths proofs become easier the moment you write down what you know and what you need. | GATE Overflow
+Engineering mathematics is high scoring when practised regularly. Don't leave it for the end. | GATE Overflow
+Pointers are just addresses. Draw the memory and they stop being scary. | GATE Overflow
+Recursion is easier to trust than to trace. Learn to trust it with a correct base case. | GATE Overflow
+For scheduling questions, a neat Gantt chart is worth more than any formula. | GATE Overflow
+For SQL questions, run the query on a tiny table in your head before choosing an answer. | GATE Overflow
+For cache questions, write the address breakdown first: tag, index, offset. | GATE Overflow
+For regular expressions, test them on the shortest strings first. | GATE Overflow
+For hashing, simulate the insertions. Collisions reveal themselves on paper. | GATE Overflow
+For graph algorithms, run them by hand on a five-vertex graph until the steps feel natural. | GATE Overflow
+
+# ---- More on effort and growth ----
+Talent sets the starting line. Effort decides where you finish. | GATE Overflow
+The hours nobody sees are the ones that show up on the scorecard. | GATE Overflow
+A little better every day is a lot better every year. | GATE Overflow
+Work like the exam is tomorrow; plan like it's months away. | GATE Overflow
+The pain of discipline weighs ounces; the regret of not trying weighs much more. | GATE Overflow
+Ambition without a schedule is just a wish. | GATE Overflow
+Your goal should scare you a little and excite you a lot. | GATE Overflow
+Do the work first. Feel motivated later. It usually arrives on the way. | GATE Overflow
+Easy topics build confidence; hard topics build rank. You need both. | GATE Overflow
+Let your results speak, but let your routine do the talking every day before that. | GATE Overflow
+When you feel like stopping, solve just one more problem. Usually you'll do five. | GATE Overflow
+The difference between trying and preparing is a plan. | GATE Overflow
+Effort is never wasted. Even unsolved problems sharpen your thinking. | GATE Overflow
+Excellence in an exam is ordinary work done unusually consistently. | GATE Overflow
+Growth is uncomfortable because you've never been here before. Keep going. | GATE Overflow
+You can't control the paper. You can control your preparation. | GATE Overflow
+Earn your confidence one solved problem at a time. | GATE Overflow
+Push your limits gently but regularly. That is how limits move. | GATE Overflow
+Don't wish it were easier. Become better. | GATE Overflow
+Show the syllabus who's in charge: one topic at a time. | GATE Overflow
+
+# ---- Reflection ----
+End each day by writing one thing you learned and one thing you'll fix tomorrow. | GATE Overflow
+Review your week honestly. What worked, what didn't, what changes next week? | GATE Overflow
+If your plan keeps failing, the plan is wrong, not you. Adjust it. | GATE Overflow
+Ask yourself weekly: am I studying, or just looking busy? | GATE Overflow
+Track hours, but track solved questions and understood concepts even more. | GATE Overflow
+Notice which mistakes repeat. Those are your highest-value topics. | GATE Overflow
+Honest self-assessment is the fastest route to improvement. | GATE Overflow
+Every month, retake an old mock. Measure growth, not just scores. | GATE Overflow
+What you learn is shaped by what you notice. Notice your own patterns. | GATE Overflow
+Celebrate the effort as well as the outcome. Both deserve recognition. | GATE Overflow
+
+# ---- Exam day ----
+On exam day, trust your preparation. It has been building for months. | GATE Overflow
+Read every question as if it were the only one on the paper. | GATE Overflow
+If a question looks unfamiliar, look for the familiar idea underneath it. | GATE Overflow
+Don't let one hard question steal time from three easy ones. | GATE Overflow
+Breathe, read, think, answer. In that order. | GATE Overflow
+The paper is the same for everyone. Calm thinking is your edge. | GATE Overflow
+Check the question number before you enter a numerical answer. | GATE Overflow
+After the exam, rest. The analysis can wait a day. | GATE Overflow
+Arrive early, settle in, and let the first question be the easiest one you see. | GATE Overflow
+Whatever happens in the exam hall, you have already grown by preparing for it. | GATE Overflow
+
+# ---- Thinking skills ----
+Before solving, restate the question in your own words. | GATE Overflow
+Look for invariants: what stays the same while everything else changes? | GATE Overflow
+Work backwards from the answer choices when forward reasoning stalls. | GATE Overflow
+Generalise from small cases, then prove what you generalised. | GATE Overflow
+Symmetry saves time. Look for it before you calculate. | GATE Overflow
+Estimate first. A rough answer guards you against a wrong precise one. | GATE Overflow
+When two methods disagree, find out why. That is where real understanding begins. | GATE Overflow
+Simplify the problem until you can solve it, then add the complexity back. | GATE Overflow
+Ask what the question is really testing. It is usually one concept in disguise. | GATE Overflow
+Name things clearly in your rough work. Clear names lead to clear thinking. | GATE Overflow
+Be suspicious of answers that need very long calculations. GATE prefers elegant ideas. | GATE Overflow
+Write down your assumptions. Many wrong answers come from an assumption you didn't notice. | GATE Overflow
+Look at the extreme cases: empty input, one element, everything equal. | GATE Overflow
+Compare your approach with the official solution. Different is fine; wrong is a lesson. | GATE Overflow
+Reasoning is a habit. Practise it on easy questions so it's there for hard ones. | GATE Overflow
+
+# ---- More from GATE Overflow ----
+The best resource is the one you actually finish. | GATE Overflow
+Collect fewer notes and solve more questions. | GATE Overflow
+A topic is done when you can solve its PYQs without looking anything up. | GATE Overflow
+Don't measure preparation by videos watched. Measure it by problems solved. | GATE Overflow
+Every subject has a core idea. Find it and everything else hangs on it. | GATE Overflow
+Your notebook is a mirror of your understanding. Keep it honest. | GATE Overflow
+Make your weak subject your project for the month. Weak subjects improve fastest. | GATE Overflow
+Strong subjects need maintenance, not neglect. Revise them too. | GATE Overflow
+If you are stuck for a week, change the resource, not the goal. | GATE Overflow
+Write mini-summaries after each chapter. They will save you in the last month. | GATE Overflow
+Learn the standard results so well that you can focus on the twist in the question. | GATE Overflow
+Quality of practice beats quantity of practice, but you need enough of both. | GATE Overflow
+Every day you study, you are a little more ready than you were. | GATE Overflow
+Hard topics need multiple passes. The second pass is where things start to click. | GATE Overflow
+Use mistakes as a map. They show the shortest path to a better score. | GATE Overflow
+The questions you can't solve today are tomorrow's syllabus. | GATE Overflow
+Mastery is when you stop fearing a topic and start looking forward to its questions. | GATE Overflow
+Your preparation is a long program. Debug it regularly. | GATE Overflow
+Learning to learn is the first skill GATE quietly tests. | GATE Overflow
+Stay curious, stay consistent, stay kind to yourself. | GATE Overflow
+Focus on understanding today; scores will catch up tomorrow. | GATE Overflow
+Don't fear the syllabus. It is finite; your effort can be enough. | GATE Overflow
+The habit of finishing what you start is the habit that clears exams. | GATE Overflow
+A clear head beats a full head. Rest before big tests. | GATE Overflow
+Good preparation feels repetitive. That repetition is the point. | GATE Overflow
+Every solved question is a vote for the person you want to become. | GATE Overflow
+Avoid zero-progress days. Even fifteen minutes keeps the topic warm. | GATE Overflow
+Keep your goals visible and your distractions invisible. | GATE Overflow
+Speed is just accuracy that has been practised many times. | GATE Overflow
+Treat each mock like the real thing and the real thing will feel like a mock. | GATE Overflow
+Know your weak topics by name. Vague weaknesses never get fixed. | GATE Overflow
+Your rank depends on what you can do under time pressure, so practise under time pressure. | GATE Overflow
+Use the first hour of the day for the hardest task. | GATE Overflow
+When motivation is low, lower the target, but don't drop it to zero. | GATE Overflow
+Learn from toppers' habits, not just their marks. | GATE Overflow
+Preparation is a marathon of small sprints. Pace each one. | GATE Overflow
+Keep a "tricky questions" list and revisit it every week. | GATE Overflow
+The best time to clear a doubt is the moment it appears. | GATE Overflow
+If a concept appears in three PYQs, it deserves a page in your notes. | GATE Overflow
+A good night's sleep is worth an extra hour of tired study. | GATE Overflow
+Make revision active: solve, recall, explain. Not just read. | GATE Overflow
+Stop collecting tips and start applying one. | GATE Overflow
+Struggle means you are learning. Ease means you are revising. Both have their place. | GATE Overflow
+The exam rewards clarity. Every hour you spend clarifying a concept is an investment. | GATE Overflow
+Make one small improvement to your study method each week. | GATE Overflow
+Your future offer letter starts with today's study session. | GATE Overflow
+A short, honest study log keeps you accountable better than any app. | GATE Overflow
+You don't rise to the level of your goals; you fall to the level of your daily routine. Raise the routine. | GATE Overflow
+Done is better than perfect when it comes to finishing the syllabus. | GATE Overflow
+Every question you attempt makes the next one less intimidating. | GATE Overflow
+Hold yourself to a standard, not to a comparison. | GATE Overflow
+Understanding why an option is wrong is as valuable as knowing which one is right. | GATE Overflow
+If you can solve it slowly, you can learn to solve it quickly. | GATE Overflow
+Make Sundays for revision and mocks. Make weekdays for new learning. | GATE Overflow
+Your effort is a signal. Keep sending it, day after day. | GATE Overflow
+Learning a little every day beats learning a lot once in a while. | GATE Overflow
+Turn your weakest topic into your favourite one by spending honest time with it. | GATE Overflow
+The goal is not to look busy. The goal is to get better. | GATE Overflow
+Every expert answer you read on GATE Overflow started as someone's doubt. Ask yours. | GATE Overflow
+The smartest move in preparation is often the simplest: start now. | GATE Overflow
+There is no substitute for solving questions with a pen in your hand. | GATE Overflow
+Hope is not a strategy. A schedule is. | GATE Overflow
+Fix one recurring mistake this week. That alone can change your score. | GATE Overflow
+Strong basics make every advanced question shorter. | GATE Overflow
+Prepare so well that the exam feels like one more practice session. | GATE Overflow
+You get better at what you practise. Practise thinking clearly. | GATE Overflow
+Every chapter you finish is a promise you kept to yourself. | GATE Overflow
+Don't let a slow start become a reason to stop. | GATE Overflow
+A focused student with a simple plan beats a distracted one with every resource. | GATE Overflow
+The work you avoid today becomes the panic you face later. Do it now. | GATE Overflow
+Today's confusion is tomorrow's clarity, if you stay with it. | GATE Overflow
+Strength in preparation comes from showing up when it's hard. | GATE Overflow
+Measure twice, mark once. | GATE Overflow
+Persistence turns a hard subject into a familiar one. | GATE Overflow
+Make peace with repetition. Mastery lives there. | GATE Overflow
+Your effort today is a gift to the version of you sitting in the exam hall. | GATE Overflow
+Simplicity in notes, depth in understanding. | GATE Overflow
+Respect the basics. They are the source of most marks. | GATE Overflow
+You'll never regret the extra hour you spent understanding something properly. | GATE Overflow
+Even a slow day of study beats a fast day of scrolling. | GATE Overflow
+One honest hour is worth more than three distracted ones. | GATE Overflow
+Make learning visible: tick topics off, watch the list shrink. | GATE Overflow
+Courage is opening the topic you've been avoiding. | GATE Overflow
+The best revenge on a bad mock is a thorough analysis. | GATE Overflow
+Think of every question as a conversation with the examiner. Listen carefully. | GATE Overflow
+Effort is the only variable fully under your control. Maximise it wisely. | GATE Overflow
+Sharpen the basics until hard questions feel like combinations of easy ones. | GATE Overflow
+Celebrate milestones: first full mock, first full revision, first topic mastered. | GATE Overflow
+Keep moving forward. Even small steps cover long distances. | GATE Overflow

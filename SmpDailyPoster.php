@@ -16,6 +16,10 @@ class SmpDailyPoster
     function init_queries($tableslc)
     {
         require_once $this->directory . 'SmpConstants.php';
+        if (!in_array(qa_db_add_table_prefix('smp_quote_library'), $tableslc, true)
+            || !in_array(qa_db_add_table_prefix('smp_quote_history'), $tableslc, true)) {
+            return [];
+        }
         $this->runDailyPosts();
         return [];
     }
@@ -201,19 +205,7 @@ class SmpDailyPoster
             // Mark as posted in the bank
             $poster->markQuotePosted($today);
         } else {
-            // Fallback: generate on the fly via OpenAI
-            $customPrompt = qa_opt(SmpConstants::OPT_QUOTE_PROMPT);
-            if (empty($customPrompt)) {
-                $customPrompt = 'Generate a unique, inspiring motivational quote suitable for students preparing for competitive exams. '
-                    . 'Include the quote and attribute it to a famous person or mark it as anonymous. '
-                    . 'Format it nicely for social media with emojis. Add #QuoteOfTheDay #Motivation hashtags.';
-            }
-
-            $todayStr = date('l, F j, Y');
-            $quote = $poster->openaiGenerateMessage(
-                'Generate a motivational Quote of the Day for ' . $todayStr,
-                $customPrompt
-            );
+            $quote = $poster->pickLibraryQuote($today);
         }
 
         if (empty($quote)) {

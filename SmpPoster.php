@@ -1489,11 +1489,11 @@ class SmpPoster
     }
 
     /**
-     * Save an entire quote bank to the smp_quotes table (replaces all existing).
+    * Replace pending quote-bank rows while preserving the posted history.
      */
     public function saveQuoteBank(array $bank): void
     {
-        qa_db_query_sub('DELETE FROM ^smp_quotes');
+        qa_db_query_sub("DELETE FROM ^smp_quotes WHERE `status` = 'pending'");
         foreach ($bank as $entry) {
             qa_db_query_sub(
                 'INSERT INTO ^smp_quotes (`quote_date`, `quote_text`, `status`) VALUES ($, $, $)',
@@ -1502,6 +1502,170 @@ class SmpPoster
                 $entry['status'] ?? 'pending'
             );
         }
+    }
+
+    const QUOTE_GAP_DAYS = 500;
+
+    /**
+     * Load quotes-library.txt into ^smp_quote_library when the file changes (existing rows keep their history).
+     */
+    public function syncQuoteLibrary(): int
+    {
+        static $syncedCount = null;
+        if ($syncedCount !== null) {
+            return $syncedCount;
+        }
+        $file = $this->directory . 'quotes-library.txt';
+        if (!is_file($file)) {
+            return $syncedCount = 0;
+        }
+        $mtime = (string)filemtime($file);
+        if (qa_opt('smp_quote_library_mtime') !== $mtime) {
+            foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#' || substr_count($line, '|') !== 1) {
+                    continue;
+                }
+                [$text, $author] = array_map('trim', explode('|', $line));
+                qa_db_query_sub(
+                    'INSERT IGNORE INTO ^smp_quote_library (`qhash`, `quote`, `author`) VALUES ($, $, $)',
+                    self::quoteHash($text), $text, $author
+                );
+            }
+            qa_opt('smp_quote_library_mtime', $mtime);
+        }
+        if (qa_opt('smp_quote_library_history_seeded') !== '3') {
+            qa_db_query_sub('UPDATE ^smp_quote_library SET `last_posted` = NULL');
+            qa_db_query_sub('DELETE FROM ^smp_quote_history');
+            foreach (qa_db_read_all_assoc(qa_db_query_sub("SELECT `quote_text`, MAX(`quote_date`) AS last_date FROM ^smp_quotes WHERE `status` = 'posted' GROUP BY `quote_text`")) as $row) {
+                $text = $this->quoteBody($row['quote_text']);
+                if ($text !== '') {
+                    qa_db_query_sub('INSERT INTO ^smp_quote_history (`qhash`, `last_posted`) VALUES ($, $) ON DUPLICATE KEY UPDATE `last_posted` = GREATEST(`last_posted`, VALUES(`last_posted`))', self::quoteHash($text), $row['last_date']);
+                }
+            }
+            qa_opt('smp_quote_library_history_seeded', '3');
+        }
+        return $syncedCount = (int)qa_db_read_one_value(qa_db_query_sub('SELECT COUNT(*) FROM ^smp_quote_library'));
+    }
+
+    private function quoteBody(string $text): string
+    {
+        $text = html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8');
+        $text = preg_replace('/\s+(?:#\w+\s*)+$/u', '', trim($text));
+        $text = preg_replace('/\s+[—–-]\s+[^—–-]{2,120}$/u', '', $text);
+        return trim($text, " \t\n\r\0\x0B\"'“”‘’");
+    }
+
+    private static function quoteHash(string $text): string
+    {
+        return md5(preg_replace('/[^a-z0-9]/', '', strtolower($text)));
+    }
+
+    /**
+     * Take the least recently used library quote not used within QUOTE_GAP_DAYS of $date, and reserve it for $date.
+     */
+    public function pickLibraryQuote(string $date, bool $reserveOnly = false): ?string
+    {
+        if ($this->syncQuoteLibrary() === 0) {
+            return null;
+        }
+        $locked = (int)qa_db_read_one_value(qa_db_query_sub('SELECT GET_LOCK($, #)', 'smp_quote_library_pick', 2), true);
+        if (!$locked) {
+            return null;
+        }
+        try {
+        $row = qa_db_read_one_assoc(qa_db_query_sub(
+            'SELECT `id`, `quote`, `author` FROM ^smp_quote_library
+                         WHERE (`last_posted` IS NULL OR `last_posted` < DATE_SUB($, INTERVAL # DAY))
+                             AND NOT EXISTS (SELECT 1 FROM ^smp_quote_history h WHERE h.qhash = ^smp_quote_library.qhash AND h.last_posted >= DATE_SUB($, INTERVAL # DAY))
+             ORDER BY `last_posted` IS NOT NULL, `last_posted`, RAND() LIMIT 1',
+                        $date, self::QUOTE_GAP_DAYS, $date, self::QUOTE_GAP_DAYS
+        ), true);
+        if (!$row) {
+            return null;
+        }
+        qa_db_query_sub('UPDATE ^smp_quote_library SET `last_posted` = $ WHERE `id` = #', $date, $row['id']);
+        if (!$reserveOnly) {
+            qa_db_query_sub('INSERT INTO ^smp_quote_history (`qhash`, `last_posted`) VALUES ($, $) ON DUPLICATE KEY UPDATE `last_posted` = GREATEST(`last_posted`, VALUES(`last_posted`))', self::quoteHash($row['quote']), $date);
+        }
+        return '"' . $row['quote'] . '" — ' . $row['author'] . ' #QuoteOfTheDay #GATEPreparation';
+        } finally {
+            qa_db_query_sub('SELECT RELEASE_LOCK($)', 'smp_quote_library_pick');
+        }
+    }
+
+    /**
+     * Quote bank for $count days from $startDate, drawn from the library without repeats.
+     */
+    public function buildQuoteBankFromLibrary(string $startDate, int $count): array
+    {
+        $pending = qa_db_read_all_assoc(qa_db_query_sub("SELECT `quote_text`, `quote_date` FROM ^smp_quotes WHERE `status` = 'pending'"));
+        foreach ($pending as $row) {
+            $body = $this->quoteBody($row['quote_text']);
+            if ($body !== '') {
+                qa_db_query_sub('UPDATE ^smp_quote_library SET `last_posted` = NULL WHERE `qhash` = $', self::quoteHash($body));
+            }
+        }
+        $bank = [];
+        $date = new DateTime($startDate);
+        for ($i = 0; $i < $count; $i++) {
+            $quote = $this->pickLibraryQuote($date->format('Y-m-d'), true);
+            if ($quote === null) {
+                break;
+            }
+            $bank[] = ['date' => $date->format('Y-m-d'), 'quote' => $quote, 'status' => 'pending'];
+            $date->modify('+1 day');
+        }
+        if (count($bank) !== $count) {
+            foreach ($bank as $entry) {
+                $body = $this->quoteBody($entry['quote']);
+                if ($body !== '') {
+                    qa_db_query_sub('UPDATE ^smp_quote_library SET `last_posted` = NULL WHERE `qhash` = $', self::quoteHash($body));
+                }
+            }
+            foreach ($pending as $row) {
+                $body = $this->quoteBody($row['quote_text']);
+                if ($body !== '') {
+                    qa_db_query_sub('UPDATE ^smp_quote_library SET `last_posted` = $ WHERE `qhash` = $', $row['quote_date'], self::quoteHash($body));
+                }
+            }
+            return [];
+        }
+        return $bank;
+    }
+
+    /**
+    * Replace pending bank entries from $fromDate onward with library quotes (posted history is kept).
+     */
+    public function refillPendingQuotes(string $fromDate): int
+    {
+        $rows = qa_db_read_all_assoc(qa_db_query_sub(
+            "SELECT `id`, `quote_date` FROM ^smp_quotes WHERE `status` = 'pending' AND `quote_date` >= $ ORDER BY `quote_date`",
+            $fromDate
+        ));
+        $n = 0;
+        foreach ($rows as $r) {
+            $quote = $this->pickLibraryQuote($r['quote_date'], true);
+            if ($quote !== null) {
+                qa_db_query_sub('UPDATE ^smp_quotes SET `quote_text` = $ WHERE `id` = #', $quote, $r['id']);
+                $n++;
+            }
+        }
+        return $n;
+    }
+
+    public function replacePendingQuoteFromLibrary(int $id): bool
+    {
+        $row = qa_db_read_one_assoc(qa_db_query_sub("SELECT `quote_date` FROM ^smp_quotes WHERE `id` = # AND `status` = 'pending'", $id), true);
+        if (!$row) {
+            return false;
+        }
+        $quote = $this->pickLibraryQuote($row['quote_date'], true);
+        if ($quote === null) {
+            return false;
+        }
+        qa_db_query_sub('UPDATE ^smp_quotes SET `quote_text` = $ WHERE `id` = #', $quote, $id);
+        return true;
     }
 
     /**
@@ -1547,10 +1711,17 @@ class SmpPoster
      */
     public function markQuotePosted(string $date): void
     {
+        $rows = qa_db_read_all_assoc(qa_db_query_sub("SELECT `quote_text` FROM ^smp_quotes WHERE `quote_date` = $ AND `status` = 'pending'", $date));
         qa_db_query_sub(
             'UPDATE ^smp_quotes SET `status` = \'posted\' WHERE `quote_date` = $',
             $date
         );
+        foreach ($rows as $row) {
+            $text = $this->quoteBody($row['quote_text']);
+            if ($text !== '') {
+                qa_db_query_sub('INSERT INTO ^smp_quote_history (`qhash`, `last_posted`) VALUES ($, $) ON DUPLICATE KEY UPDATE `last_posted` = GREATEST(`last_posted`, VALUES(`last_posted`))', self::quoteHash($text), $date);
+            }
+        }
     }
 
     /**
