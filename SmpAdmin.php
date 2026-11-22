@@ -251,6 +251,11 @@ class SmpAdmin
 
         $isSuperAdmin = qa_get_logged_in_level() >= QA_USER_LEVEL_SUPER;
 
+        $fields['manual_post_link'] = [
+            'type' => 'static',
+            'label' => '<a href="' . qa_path_html('smp-manual-post') . '" style="display:inline-block;padding:8px 14px;border:1px solid #4285f4;border-radius:4px;color:#1a73e8;text-decoration:none;font-weight:600;">Open Manual Social Media Composer</a>',
+        ];
+
         // ========== SECTION: General / OpenAI Settings ==========
         $fields['section_general'] = [
             'type' => 'static',
@@ -2084,7 +2089,8 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
             $imageUrl = $imageGen->generateFromText(
                 $candidate['content'],
                 'Question of the Day: ' . $candidate['title'],
-                (int)$candidate['postid']
+                (int)$candidate['postid'],
+                true
             );
 
             if ($imageUrl !== null) {
@@ -2286,7 +2292,7 @@ configs.forEach(function(c2,j){if(c2.tpl===c.tpl)debounceRefresh(j);});
             $postId = (int)$question['postid'];
             $excludeIds[] = $postId;
 
-            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId);
+            $imageUrl = $imageGen->generateFromText($content, 'Question of the Day: ' . $title, $postId, true);
 
             if (!empty($imageUrl)) {
                 $safeUrl = htmlspecialchars($imageUrl, ENT_QUOTES, 'UTF-8');

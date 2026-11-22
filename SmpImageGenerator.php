@@ -52,7 +52,7 @@ class SmpImageGenerator
      * @param int|null $postId Optional post ID for unique filename
      * @return string|null Public URL of the generated image, or null on failure
      */
-    public function generateFromText(string $text, string $title = '', ?int $postId = null): ?string
+    public function generateFromText(string $text, string $title = '', ?int $postId = null, bool $portrait = false): ?string
     {
         // Extract options and question body as HTML (preserving MathJax)
         $questionHtml = '';
@@ -62,7 +62,7 @@ class SmpImageGenerator
         $titleClean = htmlspecialchars(html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8'), ENT_QUOTES, 'UTF-8');
 
         $w = $this->width;
-        $h = $this->height;
+        $h = $portrait ? max($this->height, (int)round($w * 1.25)) : $this->height;
 
         $customSiteName = qa_opt(SmpConstants::OPT_IMAGE_SITE_NAME);
         $siteName = htmlspecialchars($customSiteName ?: qa_opt('site_title') ?: qa_opt('site_name') ?: '', ENT_QUOTES, 'UTF-8');
@@ -77,7 +77,10 @@ class SmpImageGenerator
         }
 
         // Build the full HTML page
-        $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean);
+        $html = $this->applyPortraitReadableStyles(
+            $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean),
+            $portrait
+        );
 
         // Pre-render math server-side via Node.js KaTeX
         $html = $this->renderMathServerSide($html);
@@ -141,13 +144,23 @@ class SmpImageGenerator
 .question-card{padding:18px 24px !important;margin-bottom:12px !important}
 .content::after{content:"";position:absolute;bottom:72px;left:0;right:0;height:100px;background:linear-gradient(transparent,var(--bg-color,#ffffff));pointer-events:none;z-index:2}
 ';
+            if ($portrait) {
+                $compactCss .= "\n.question-card p,.question-card{font-size:38px !important;line-height:1.3 !important}"
+                    . "\n.question-card ol,.question-card ul{font-size:34px !important;line-height:1.25 !important}"
+                    . "\n.question-card table,.question-card pre,.question-card code{font-size:31px !important}"
+                    . "\n.option-text{font-size:34px !important;line-height:1.25 !important}"
+                    . "\n.option-label{font-size:27px !important}";
+            }
             // Detect dark mode for fade gradient color
             $style = qa_opt(SmpConstants::OPT_IMAGE_STYLE) ?: 'light';
             if ($style === 'dark') {
                 $compactCss = str_replace('var(--bg-color,#ffffff)', '#0f172a', $compactCss);
             }
 
-            $html = $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean);
+            $html = $this->applyPortraitReadableStyles(
+                $this->buildQotdHtml($questionHtml, $optionsDivs, $siteName, $siteHost, $w, $h, $titleClean),
+                $portrait
+            );
             // Inject compact CSS before </style>
             $html = str_replace('</style>', $compactCss . '</style>', $html);
             $html = $this->renderMathServerSide($html);
@@ -156,6 +169,31 @@ class SmpImageGenerator
 
             $tempHtml = tempnam(sys_get_temp_dir(), 'smp_qotd_') . '.html';
             file_put_contents($tempHtml, $html);
+
+            if ($portrait) {
+                $compactMeasure = tempnam(sys_get_temp_dir(), 'smp_measure_') . '.png';
+                $compactMeasureCmd = sprintf(
+                    'wkhtmltoimage --enable-local-file-access --disable-javascript --width %d --quality 40 --disable-smart-width --quiet %s %s 2>&1',
+                    $w,
+                    escapeshellarg($tempHtml),
+                    escapeshellarg($compactMeasure)
+                );
+                exec($compactMeasureCmd, $compactOut, $compactExit);
+                $compactHeight = 0;
+                if ($compactExit === 0 && file_exists($compactMeasure)) {
+                    $compactImage = @imagecreatefrompng($compactMeasure);
+                    if ($compactImage) {
+                        $compactHeight = imagesy($compactImage);
+                        imagedestroy($compactImage);
+                    }
+                }
+                @unlink($compactMeasure);
+                if ($compactHeight > $h + 40) {
+                    @unlink($tempHtml);
+                    @unlink($tempPng);
+                    return null;
+                }
+            }
         }
 
         // Run wkhtmltoimage at fixed dimensions (no JS needed — math is pre-rendered)
@@ -171,17 +209,30 @@ class SmpImageGenerator
 
         if ($exitCode !== 0 || !file_exists($tempPng)) {
             @unlink($tempPng);
-            return $this->generateFromTextGd($text, $title, $postId);
+            return $this->generateFromTextGd($text, $title, $postId, $h, $portrait);
         }
 
         $img = imagecreatefrompng($tempPng);
         @unlink($tempPng);
 
         if (!$img) {
-            return $this->generateFromTextGd($text, $title, $postId);
+            return $this->generateFromTextGd($text, $title, $postId, $h, $portrait);
         }
 
         return $this->saveImage($img, 'smp_qotd_' . ($postId ?: uniqid()) . '_' . time());
+    }
+
+    private function applyPortraitReadableStyles(string $html, bool $portrait): string
+    {
+        if (!$portrait) {
+            return $html;
+        }
+        $css = "\n.question-card p,.question-card{font-size:42px!important;line-height:1.4!important}"
+            . "\n.question-card ol,.question-card ul{font-size:38px!important;line-height:1.35!important}"
+            . "\n.question-card table,.question-card pre,.question-card code{font-size:34px!important}"
+            . "\n.option-text{font-size:36px!important;line-height:1.3!important}"
+            . "\n.option-label{font-size:28px!important}";
+        return str_replace('</style>', $css . '</style>', $html);
     }
 
     /**
@@ -684,7 +735,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
     /**
      * Fallback: generate QOTD image using GD when wkhtmltoimage is unavailable.
      */
-    private function generateFromTextGd(string $text, string $title = '', ?int $postId = null): ?string
+    private function generateFromTextGd(string $text, string $title = '', ?int $postId = null, ?int $targetHeight = null, bool $portrait = false): ?string
     {
         if (!extension_loaded('gd')) {
             return null;
@@ -699,7 +750,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
         $title = html_entity_decode(strip_tags($title), ENT_QUOTES, 'UTF-8');
 
         $w = $this->width;
-        $h = $this->height;
+        $h = $targetHeight ?? $this->height;
 
         $img = imagecreatetruecolor($w, $h);
         if (!$img) return null;
@@ -748,15 +799,19 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
         // Question card
         $cardBg = imagecolorallocatealpha($img, 255, 255, 255, 108);
         $cardPadding = 28;
-        $qFontSize = 22;
+        $qFontSize = $portrait ? 34 : 22;
         $qLen = mb_strlen($questionBody);
-        if ($qLen > 300) $qFontSize = 18;
-        elseif ($qLen > 200) $qFontSize = 20;
+        if ($qLen > 300) $qFontSize = $portrait ? 28 : 18;
+        elseif ($qLen > 200) $qFontSize = $portrait ? 31 : 20;
         $qInnerW = $innerW - 2 * $cardPadding;
         $wrappedQ = $this->wrapText($questionBody, $qFontSize, $qInnerW);
         $qLineH = $qFontSize + 10;
-        $maxQLines = empty($options) ? 18 : (count($options) <= 4 ? 7 : 5);
+        $maxQLines = $portrait ? (empty($options) ? 18 : 10) : (empty($options) ? 18 : (count($options) <= 4 ? 7 : 5));
         if (count($wrappedQ) > $maxQLines) {
+            if ($portrait) {
+                imagedestroy($img);
+                return null;
+            }
             $wrappedQ = array_slice($wrappedQ, 0, $maxQLines);
             $wrappedQ[$maxQLines - 1] .= '...';
         }
@@ -774,11 +829,11 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
 
         // Options
         if (!empty($options)) {
-            $optFontSize = 18; $optLineH = $optFontSize + 8; $optPadY = 16;
+            $optFontSize = $portrait ? 28 : 18; $optLineH = $optFontSize + 8; $optPadY = 16;
             $circleD = 38; $optGap = 12; $optTextXOffset = $circleD + 24; $labelSize = 15;
             $maxOptLen = 0;
             foreach ($options as $opt) $maxOptLen = max($maxOptLen, mb_strlen($opt['text']));
-            if ($maxOptLen > 80 || count($options) > 4) { $optFontSize = 16; $optLineH = $optFontSize + 8; }
+            if ($maxOptLen > 80 || count($options) > 4) { $optFontSize = $portrait ? 24 : 16; $optLineH = $optFontSize + 8; }
             $optInnerW = $innerW - $optTextXOffset - 24;
             $optSurfaceBg = imagecolorallocatealpha($img, 255, 255, 255, 112);
             $optTextCol = imagecolorallocate($img, 220, 230, 245);
@@ -786,7 +841,13 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
             foreach ($options as $opt) {
                 $wrappedOpt = $this->wrapText($opt['text'], $optFontSize, $optInnerW);
                 $boxH = max($circleD + 8, count($wrappedOpt) * $optLineH + 2 * $optPadY);
-                if ($yOffset + $boxH + $optGap > $h - 80) break;
+                if ($yOffset + $boxH + $optGap > $h - 80) {
+                    if ($portrait) {
+                        imagedestroy($img);
+                        return null;
+                    }
+                    break;
+                }
                 $this->drawRoundedRect($img, $padding, (int)$yOffset, $padding + $innerW, (int)($yOffset + $boxH), 12, $optSurfaceBg);
                 $circleCX = $padding + 16 + (int)($circleD / 2);
                 $circleCY = (int)($yOffset + $boxH / 2);
@@ -1212,6 +1273,11 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
             ]
         );
 
+        $quoteLength = mb_strlen($rawQuote);
+        $quoteFontSize = $quoteLength <= 120 ? 50 : ($quoteLength <= 220 ? 44 : ($quoteLength <= 320 ? 38 : 32));
+        $readabilityCss = '<style>.quote-body{font-size:' . $quoteFontSize . 'px!important;line-height:1.35!important}.attribution{font-size:26px!important}</style>';
+        $html = str_replace('</head>', $readabilityCss . '</head>', $html);
+
         return $this->renderHtmlToImage($html, 'smp_quote');
     }
 
@@ -1316,14 +1382,8 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
         $yOffset += $quoteMarkSize + 10;
 
         // --- Quote body text (centered, white, serif) ---
-        $quoteFontSize = $this->fontSize + 2;
-        // Adjust font size if quote is very long
         $quoteLen = mb_strlen($rawQuote);
-        if ($quoteLen > 300) {
-            $quoteFontSize = max(20, $this->fontSize - 4);
-        } elseif ($quoteLen > 200) {
-            $quoteFontSize = max(22, $this->fontSize - 2);
-        }
+        $quoteFontSize = $quoteLen <= 120 ? 50 : ($quoteLen <= 220 ? 44 : ($quoteLen <= 320 ? 38 : 32));
 
         $wrappedQuote = $this->wrapText($rawQuote, $quoteFontSize, $innerW);
         $lineHeight = $quoteFontSize + 12;
@@ -1361,7 +1421,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
 
         // --- Attribution ---
         if (!empty($attribution)) {
-            $attrSize = $this->fontSize - 4;
+            $attrSize = max(22, $quoteFontSize - 16);
             $attrText = "\xe2\x80\x94 " . $attribution; // — dash
             $attrBox = imagettfbbox($attrSize, 0, $fontRegular, $attrText);
             $attrW = abs($attrBox[2] - $attrBox[0]);

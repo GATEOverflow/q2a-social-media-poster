@@ -123,7 +123,8 @@ class SmpDailyPoster
             $imageUrl = $imageGen->generateFromText(
                 $question['content'],
                 'Question of the Day: ' . $question['title'],
-                (int)$question['postid']
+                (int)$question['postid'],
+                true
             );
 
             if ($imageUrl !== null) {
@@ -170,7 +171,12 @@ class SmpDailyPoster
             'Reformat this question-of-the-day social media post. Keep the question, options, and link. Make it engaging. Do not reveal the answer.'
         );
 
-        $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, ['title' => $title]);
+        $extra = ['title' => $title];
+        $poll = $this->buildTelegramPoll($question, $url);
+        if ($poll !== null) {
+            $extra['telegram_poll'] = $poll;
+        }
+        $results = $poster->postToAll(SmpConstants::CONTENT_QOTD, $message, $imageUrl, $extra);
 
         $poster->reportPostingSummary(
             'Question of the Day',
@@ -249,6 +255,19 @@ class SmpDailyPoster
         $lastPostId = (int)qa_opt(SmpConstants::OPT_QOTD_LAST_POSTID);
         $excludeTags = qa_opt(SmpConstants::OPT_QOTD_EXCLUDE_TAGS);
         $categories = qa_opt(SmpConstants::OPT_QOTD_CATEGORIES);
+        $globalTags = array_filter(array_map('trim', explode(',', (string)qa_opt('qa-filtertags-global'))));
+        $globalTagSet = array_fill_keys(array_map('strtolower', $globalTags), true);
+        $examTags = qa_db_read_all_values(qa_db_query_sub("SELECT DISTINCT tag FROM ^exams WHERE tag IS NOT NULL AND tag <> ''"));
+        $restrictedExamTags = array_values(array_filter($examTags, function ($tag) use ($globalTagSet) {
+            return isset($globalTagSet[strtolower(trim($tag))]);
+        }));
+        $restrictedWhere = '';
+        if ($restrictedExamTags) {
+            $quotedTags = array_map(function ($tag) {
+                return "'" . qa_db_escape_string($tag) . "'";
+            }, $restrictedExamTags);
+            $restrictedWhere = " AND NOT EXISTS (SELECT 1 FROM ^exams locked_exam WHERE locked_exam.tag IN (" . implode(',', $quotedTags) . ") AND FIND_IN_SET(locked_exam.tag, REPLACE(^posts.tags, ' ', '')) > 0)";
+        }
 
         // Use Q2A's basic selectspec so any plugin overrides/filtering get applied
         require_once QA_INCLUDE_DIR . 'db/selects.php';
@@ -296,10 +315,12 @@ class SmpDailyPoster
             . "JOIN ^ec_answers a ON ^posts.postid = a.postid "
             . "WHERE ^posts.type = 'Q' "
             . "AND ^posts.closedbyid IS NULL "
-            . "AND a.answer_str != '' "
+            . "AND TRIM(a.answer_str) != '' "
+            . "AND UPPER(TRIM(a.answer_str)) NOT IN ('X', 'NA', 'N/A') "
             . "AND LENGTH(^posts.content) < 1500 "
             . "AND " . $tagWhere
             . $catWhere
+            . $restrictedWhere
             . $excludeWhere
             . " ORDER BY RAND() LIMIT 1";
 
@@ -368,7 +389,7 @@ class SmpDailyPoster
 
         // Fallback: match plain text patterns like "A) ...", "(A) ..."
         $text = strip_tags(html_entity_decode($content, ENT_QUOTES, 'UTF-8'));
-        if (preg_match_all('/(?:^|\n)\s*(?:\(?([A-Da-d])\)\.?|([A-Da-d])[\)\.]\s*)(.+)/m', $text, $matches, PREG_SET_ORDER)) {
+        if (preg_match_all('/(?:^|\n)\s*(?:\(?([A-L])\)\.?|([A-L])[\)\.]\s*)(.+)/mi', $text, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $letter = strtoupper($match[1] ?: $match[2]);
                 $optionText = trim($match[3]);
@@ -377,6 +398,49 @@ class SmpDailyPoster
         }
 
         return $options;
+    }
+
+    private function buildTelegramPoll(array $question, string $url): ?array
+    {
+        $options = $this->extractOptions((string)$question['content']);
+        if (count($options) < 2 || count($options) > 12) {
+            return null;
+        }
+
+        $answerKey = strtoupper(trim((string)$question['answer_str']));
+        if ($answerKey === '' || in_array($answerKey, ['X', 'NA', 'N/A'], true) || preg_match('/[;,\/]/', $answerKey)) {
+            return null;
+        }
+
+        $pollOptions = [];
+        $correctOption = null;
+        foreach ($options as $index => $option) {
+            if (!preg_match('/^([A-Z]+|\d+)\)\s*(.*)$/us', trim($option), $match)) {
+                return null;
+            }
+            if (strtoupper($match[1]) === $answerKey) {
+                $correctOption = $index;
+            }
+            $pollOptions[] = mb_substr(trim($match[2]), 0, 100);
+        }
+        if ($correctOption === null) {
+            return null;
+        }
+
+        $stemHtml = preg_replace('/<(ol|ul)\b[^>]*>.*?<\/\1>/is', ' ', (string)$question['content']);
+        $stem = html_entity_decode(strip_tags($stemHtml ?? ''), ENT_QUOTES, 'UTF-8');
+        $stem = preg_replace('/(?:^|\n)\s*\(?[A-L]\)?[\)\.]\s*[^\n]+/mi', ' ', $stem) ?? $stem;
+        $stem = trim(preg_replace('/\s+/u', ' ', $stem) ?? $stem);
+        if ($stem === '') {
+            return null;
+        }
+
+        return [
+            'question' => mb_substr($stem, 0, 300),
+            'options' => $pollOptions,
+            'correct_option_id' => $correctOption,
+            'explanation' => mb_substr('Answer and discussion: ' . $url, 0, 200),
+        ];
     }
 
     /**

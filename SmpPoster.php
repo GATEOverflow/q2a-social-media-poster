@@ -298,7 +298,7 @@ class SmpPoster
 
         switch ($platform) {
             case SmpConstants::PLATFORM_TELEGRAM:
-                return $this->postToTelegram($creds, $message, $imageUrl);
+                return $this->postToTelegram($creds, $message, $imageUrl, $extra);
             case SmpConstants::PLATFORM_FACEBOOK:
                 return $this->postToFacebook($creds, $message, $imageUrl);
             case SmpConstants::PLATFORM_X:
@@ -322,7 +322,7 @@ class SmpPoster
     /**
      * Post to Telegram.
      */
-    private function postToTelegram(array $creds, string $message, ?string $imageUrl = null): array
+    private function postToTelegram(array $creds, string $message, ?string $imageUrl = null, array $extra = []): array
     {
         $botToken = $creds['bot_token'] ?? '';
         $chatId = $creds['chat_id'] ?? '';
@@ -332,7 +332,19 @@ class SmpPoster
             return ['success' => false, 'error' => 'Missing Telegram credentials'];
         }
 
-        if (!empty($imageUrl)) {
+        $poll = $extra['telegram_poll'] ?? null;
+        if (is_array($poll) && count($poll['options'] ?? []) >= 2) {
+            $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendPoll";
+            $postData = [
+                'chat_id' => $chatId,
+                'question' => $poll['question'],
+                'options' => json_encode(array_values($poll['options']), JSON_UNESCAPED_UNICODE),
+                'type' => 'quiz',
+                'correct_option_id' => (int)$poll['correct_option_id'],
+                'is_anonymous' => 'true',
+                'explanation' => $poll['explanation'] ?? '',
+            ];
+        } elseif (!empty($imageUrl)) {
             // Send photo with caption
             $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendPhoto";
             $postData = [
