@@ -1828,6 +1828,16 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
                     $brandX = (int)(($w - $totalBrandW) / 2);
 
                     $logoY = $brandY + (int)(($brandFontSize - $logoH) / 2);
+                    $logoBg = imagecolorallocatealpha($img, 255, 255, 255, 10);
+                    $this->drawRoundedRect(
+                        $img,
+                        $brandX - 10,
+                        $logoY - 6,
+                        $brandX + $logoW + 10,
+                        $logoY + $logoH + 6,
+                        8,
+                        $logoBg
+                    );
                     imagecopyresampled($img, $logo, $brandX, $logoY, 0, 0, $logoW, $logoH, $logoInfo[0], $logoInfo[1]);
                     imagedestroy($logo);
                     $brandX += $logoW + $gap;
