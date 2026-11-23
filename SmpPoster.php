@@ -334,6 +334,15 @@ class SmpPoster
 
         $poll = $extra['telegram_poll'] ?? null;
         if (is_array($poll) && count($poll['options'] ?? []) >= 2) {
+            if (!empty($poll['intro'])) {
+                $introPoll = $poll;
+                unset($introPoll['intro']);
+                $intro = $this->postToTelegram($creds, htmlspecialchars($poll['intro'], ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+                if (empty($intro['success'])) {
+                    return $intro;
+                }
+                return $this->postToTelegram($creds, $message, $imageUrl, ['telegram_poll' => $introPoll] + $extra);
+            }
             $url = "https://api.telegram.org/bot" . urlencode($botToken) . "/sendPoll";
             $postData = [
                 'chat_id' => $chatId,

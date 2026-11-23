@@ -21,6 +21,8 @@ class SmpConstants
     const CONTENT_JOB = 'job';
     const CONTENT_QOTD = 'qotd';
     const CONTENT_QUOTE = 'quote';
+    const CONTENT_HISTORY = 'history';
+    const CONTENT_GO_MOTIVATION = 'go_motivation';
 
     // Option keys
     const OPT_PREFIX = 'smp_';
@@ -75,6 +77,7 @@ class SmpConstants
     const OPT_QUOTE_HOUR = 'smp_quote_hour';
     const OPT_QUOTE_LAST_RUN = 'smp_quote_last_run';
     const OPT_QUOTE_PROMPT = 'smp_quote_prompt';
+    const OPT_HISTORY_ENABLED = 'smp_history_enabled';
     const OPT_CRON_KEY = 'smp_cron_key';
 
     // Manual share settings
@@ -139,6 +142,8 @@ class SmpConstants
             self::CONTENT_JOB => 'Job',
             self::CONTENT_QOTD => 'Question of the Day',
             self::CONTENT_QUOTE => 'Quote of the Day',
+            self::CONTENT_HISTORY => 'Daily History',
+            self::CONTENT_GO_MOTIVATION => 'GO Motivation',
         ];
     }
 

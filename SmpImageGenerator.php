@@ -1024,7 +1024,7 @@ body{width:{{WIDTH}}px;height:{{HEIGHT}}px;background:linear-gradient(180deg,#2d
      * Convert MathJax/LaTeX notation to Unicode approximation for image rendering.
      * Handles $...$ inline math and common LaTeX commands.
      */
-    private function convertMathJaxToUnicode(string $text): string
+    public function convertMathJaxToUnicode(string $text): string
     {
         // Process display math $$...$$ first
         $text = preg_replace_callback('/\$\$(.+?)\$\$/s', function ($m) {

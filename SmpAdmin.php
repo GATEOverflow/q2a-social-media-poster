@@ -35,6 +35,7 @@ class SmpAdmin
             SmpConstants::OPT_QUOTE_ENABLED => '0',
             SmpConstants::OPT_QUOTE_HOUR => '8',
             SmpConstants::OPT_QUOTE_PROMPT => '',
+            SmpConstants::OPT_HISTORY_ENABLED => '0',
             SmpConstants::OPT_CRON_KEY => '',
         ];
 
@@ -82,6 +83,44 @@ class SmpAdmin
                 . '`last_posted` DATE NOT NULL'
                 . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
         }
+        if (!in_array(qa_db_add_table_prefix('smp_history'), $tableslc)) {
+            $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_history ('
+                . '`month_day` CHAR(5) NOT NULL PRIMARY KEY, '
+                . '`content` TEXT NOT NULL, '
+                . '`source_url` VARCHAR(2048) NOT NULL DEFAULT \'\', '
+                . '`approved` TINYINT(1) NOT NULL DEFAULT 0, '
+                . '`updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+        }
+            if (!in_array(qa_db_add_table_prefix('smp_history_delivery'), $tableslc)) {
+                $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_history_delivery ('
+                . '`post_date` DATE NOT NULL, '
+                . '`account_id` VARCHAR(64) NOT NULL, '
+                . '`status` VARCHAR(16) NOT NULL, '
+                . '`updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, '
+                . 'PRIMARY KEY (`post_date`, `account_id`)'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+            }
+            if (!in_array(qa_db_add_table_prefix('smp_scheduled_posts'), $tableslc)) {
+                $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_scheduled_posts ('
+                . '`content_type` VARCHAR(32) NOT NULL, '
+                . '`post_date` DATE NOT NULL, '
+                . '`content` TEXT NOT NULL, '
+                . '`status` VARCHAR(16) NOT NULL, '
+                . '`updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, '
+                . 'PRIMARY KEY (`content_type`, `post_date`)'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+            }
+            if (!in_array(qa_db_add_table_prefix('smp_scheduled_delivery'), $tableslc)) {
+                $queries[] = 'CREATE TABLE IF NOT EXISTS ^smp_scheduled_delivery ('
+                . '`content_type` VARCHAR(32) NOT NULL, '
+                . '`post_date` DATE NOT NULL, '
+                . '`account_id` VARCHAR(64) NOT NULL, '
+                . '`status` VARCHAR(16) NOT NULL, '
+                . '`updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, '
+                . 'PRIMARY KEY (`content_type`, `post_date`, `account_id`)'
+                . ') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+            }
         return $queries;
     }
 
@@ -254,6 +293,11 @@ class SmpAdmin
         $fields['manual_post_link'] = [
             'type' => 'static',
             'label' => '<a href="' . qa_path_html('smp-manual-post') . '" style="display:inline-block;padding:8px 14px;border:1px solid #4285f4;border-radius:4px;color:#1a73e8;text-decoration:none;font-weight:600;">Open Manual Social Media Composer</a>',
+        ];
+        $fields['history_calendar_link'] = [
+            'type' => 'static',
+            'label' => '<a href="' . qa_path_html('smp-history') . '">Review daily history calendar</a>'
+                . ' &middot; <a href="' . qa_path_html('smp-routes') . '">View posting destinations</a>',
         ];
 
         // ========== SECTION: General / OpenAI Settings ==========

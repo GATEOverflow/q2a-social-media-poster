@@ -37,18 +37,28 @@ class SmpEventJob
             return;
         }
 
-        $title = $params['title'] ?? '';
-        $postId = $params['postid'] ?? $params['jobid'] ?? 0;
+        $title = trim((string)($params['title'] ?? '')) ?: trim((string)($params['institute'] ?? ''));
+        $postId = (int)($params['postid'] ?? $params['jobid'] ?? 0);
+        $url = trim((string)($params['weblink'] ?? ''));
 
-        // Build URL using job path helper if available
-        if (function_exists('qa_job_request')) {
+        if ($url === '' && $postId > 0 && function_exists('qa_job_request')) {
             $url = qa_path_absolute(qa_job_request($postId, $title));
-        } else {
-            $url = qa_opt('site_url') . 'job/' . $postId . '/' . qa_slug($title);
+        }
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if ($title === '' || !filter_var($url, FILTER_VALIDATE_URL) || !in_array($scheme, ['http', 'https'], true)) {
+            $poster->reportFailure('Job post skipped', 'The job event is missing a title or a valid application URL.');
+            return;
         }
 
         // Generate message using OpenAI
-        $composed = $poster->composePost(SmpConstants::CONTENT_JOB, 'Job posting: ' . $title, $url, 'Apply here');
+        $details = 'Job posting: ' . $title;
+        if (!empty($params['program'])) {
+            $details .= "\nProgram: " . $params['program'];
+        }
+        if (!empty($params['deadline'])) {
+            $details .= "\nDeadline: " . $params['deadline'];
+        }
+        $composed = $poster->composePost(SmpConstants::CONTENT_JOB, $details, $url, 'Apply here');
         $message = $composed['default'];
 
         // Generate image if Instagram auto-image or YouTube auto-video is enabled

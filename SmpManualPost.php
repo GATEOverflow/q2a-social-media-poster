@@ -42,15 +42,25 @@ class SmpManualPost
             return !empty($account['enabled']);
         });
         $message = '';
+        $postTitle = '';
+        $imageUrl = '';
+        $selected = [];
+        $editorContent = '';
+        $editorFormat = '';
+        $editorName = qa_opt('editor_for_qs');
+        $editor = qa_load_editor($editorContent, $editorFormat, $editorName);
 
         if (qa_clicked('smp_manual_post')) {
+            $editorData = $editor->read_post('smp_manual_message');
+            $editorContent = $editorData['content'];
+            $editorFormat = $editorData['format'];
+            $postTitle = trim(qa_post_text('smp_manual_title'));
+            $imageUrl = trim(qa_post_text('smp_manual_image_url'));
+            $selected = $_POST['smp_manual_accounts'] ?? [];
             if (!qa_check_form_security_code('smp-manual-post', qa_post_text('code'))) {
                 $message = 'The form expired. Reload the page and try again.';
             } else {
-                $postText = trim(qa_post_text('smp_manual_message'));
-                $postTitle = trim(qa_post_text('smp_manual_title'));
-                $imageUrl = trim(qa_post_text('smp_manual_image_url'));
-                $selected = $_POST['smp_manual_accounts'] ?? [];
+                $postText = $this->editorText($editorContent, $editorFormat);
 
                 if ($postText === '' || mb_strlen($postText) > 5000) {
                     $message = 'Enter a post message between 1 and 5,000 characters.';
@@ -66,9 +76,7 @@ class SmpManualPost
                         }
                         $account = $accounts[$accountId];
                         $platform = $account['_platform'] ?? '';
-                        $accountMessage = $platform === SmpConstants::PLATFORM_TELEGRAM
-                            ? htmlspecialchars($postText, ENT_NOQUOTES, 'UTF-8')
-                            : $postText;
+                        $accountMessage = $this->formatEditorMessage($editorContent, $editorFormat, $platform, $postText);
                         try {
                             $result = $poster->postToPlatform(
                                 $platform,
@@ -137,25 +145,163 @@ class SmpManualPost
             foreach ($platformAccounts as $accountId => $account) {
                 $label = htmlspecialchars($account['name'] ?? $accountId, ENT_QUOTES, 'UTF-8');
                 $id = htmlspecialchars((string)$accountId, ENT_QUOTES, 'UTF-8');
-                $checks .= '<label style="display:inline-flex;align-items:center;gap:7px;margin:5px 16px 5px 0"><input type="checkbox" name="smp_manual_accounts[]" value="' . $id . '"> ' . $label . '</label>';
+                $checked = is_array($selected) && in_array((string)$accountId, $selected, true) ? ' checked' : '';
+                $checks .= '<label style="display:inline-flex;align-items:center;gap:7px;margin:5px 16px 5px 0"><input type="checkbox" name="smp_manual_accounts[]" value="' . $id . '"' . $checked . '> ' . $label . '</label>';
             }
             $checks .= '</fieldset>';
         }
 
-        $statusHtml = $message !== ''
-            ? '<div style="padding:10px 14px;margin:12px 0;border-radius:5px;background:#f1f3f4">' . $message . '</div>'
-            : '';
-        $content['custom'] = $statusHtml
-            . '<form method="post" action="' . qa_self_html() . '">'
-            . '<input type="hidden" name="code" value="' . htmlspecialchars(qa_get_form_security_code('smp-manual-post'), ENT_QUOTES, 'UTF-8') . '">'
-            . '<p><label for="smp-manual-title"><strong>Post title</strong></label><br><input id="smp-manual-title" name="smp_manual_title" type="text" maxlength="120" style="width:100%;max-width:760px"></p>'
-            . '<p><label for="smp-manual-message"><strong>Message</strong></label><br><textarea id="smp-manual-message" name="smp_manual_message" required maxlength="5000" rows="9" style="width:100%;max-width:760px"></textarea></p>'
-            . '<p><label for="smp-manual-image"><strong>Public image URL</strong> (optional)</label><br><input id="smp-manual-image" name="smp_manual_image_url" type="url" placeholder="https://..." style="width:100%;max-width:760px"></p>'
-            . '<p><label><input id="smp-manual-select-all" type="checkbox"> Select all enabled accounts</label></p>'
-            . $checks
-            . '<button type="submit" name="smp_manual_post" value="1" style="padding:8px 16px;cursor:pointer">Post to selected accounts</button>'
-            . '</form>'
-            . '<script>document.getElementById("smp-manual-select-all")?.addEventListener("change",function(){document.querySelectorAll("input[name^=smp_manual_accounts]").forEach(function(c){c.checked=this.checked;},this)});</script>';
+        $editorField = qa_editor_load_field($editor, $content, $editorContent, $editorFormat, 'smp_manual_message', 9);
+        $editorField['label'] = 'Message';
+        $updateScript = method_exists($editor, 'update_script') ? $editor->update_script('smp_manual_message') : '';
+        $content['form'] = [
+            'tags' => 'method="post" action="' . qa_self_html() . '"',
+            'style' => 'tall',
+            'ok' => $message,
+            'fields' => [
+                'title' => [
+                    'label' => 'Post title',
+                    'tags' => 'name="smp_manual_title" maxlength="120"',
+                    'value' => qa_html($postTitle),
+                ],
+                'message' => $editorField,
+                'image' => [
+                    'label' => 'Public image URL (optional)',
+                    'tags' => 'name="smp_manual_image_url" placeholder="https://..."',
+                    'value' => qa_html($imageUrl),
+                ],
+                'accounts' => [
+                    'type' => 'custom',
+                    'html' => '<label><input id="smp-manual-select-all" type="checkbox"> Select all enabled accounts</label>' . $checks
+                        . '<script>document.getElementById("smp-manual-select-all")?.addEventListener("change",function(){document.querySelectorAll("input[name^=smp_manual_accounts]").forEach(function(c){c.checked=this.checked;},this)});</script>',
+                ],
+            ],
+            'buttons' => [
+                'post' => [
+                    'tags' => 'name="smp_manual_post" onclick="' . qa_html($updateScript) . '"',
+                    'label' => 'Post to selected accounts',
+                ],
+            ],
+            'hidden' => ['code' => qa_html(qa_get_form_security_code('smp-manual-post'))],
+        ];
         return $content;
+    }
+
+    private function editorText(string $editorContent, string $editorFormat): string
+    {
+        if ($editorFormat === 'html') {
+            $document = new DOMDocument();
+            $previousErrors = libxml_use_internal_errors(true);
+            $loaded = $document->loadHTML('<?xml encoding="UTF-8"><div>' . $editorContent . '</div>', LIBXML_NONET | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+            libxml_clear_errors();
+            libxml_use_internal_errors($previousErrors);
+            if ($loaded) {
+                foreach ($document->getElementsByTagName('a') as $link) {
+                    $url = trim($link->getAttribute('href'));
+                    $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+                    if (in_array($scheme, ['http', 'https'], true) && filter_var($url, FILTER_VALIDATE_URL) && trim($link->textContent) !== $url) {
+                        $link->appendChild($document->createTextNode(' (' . $url . ')'));
+                    }
+                }
+                $editorContent = $document->saveHTML($document->documentElement);
+            }
+        }
+        return trim(qa_viewer_text($editorContent, $editorFormat));
+    }
+
+    private function formatEditorMessage(string $editorContent, string $editorFormat, string $platform, string $plainText): string
+    {
+        $telegram = $platform === SmpConstants::PLATFORM_TELEGRAM;
+        if (!$telegram && $platform !== SmpConstants::PLATFORM_WHATSAPP) {
+            return $plainText;
+        }
+        if ($editorFormat !== 'html') {
+            return $telegram ? htmlspecialchars($plainText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') : $plainText;
+        }
+
+        $document = new DOMDocument();
+        $previousErrors = libxml_use_internal_errors(true);
+        $loaded = $document->loadHTML('<?xml encoding="UTF-8"><div>' . $editorContent . '</div>', LIBXML_NONET | LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousErrors);
+        if (!$loaded || !$document->documentElement) {
+            return $telegram ? htmlspecialchars($plainText, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') : $plainText;
+        }
+
+        $message = $this->formatEditorNode($document->documentElement, $telegram);
+        return trim(preg_replace('/\n{3,}/', "\n\n", $message));
+    }
+
+    private function formatEditorNode(DOMNode $node, bool $telegram): string
+    {
+        if ($node instanceof DOMText) {
+            $text = preg_replace('/[\t\r\n ]+/', ' ', $node->nodeValue);
+            return $telegram ? htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') : $text;
+        }
+        if (!$node instanceof DOMElement) {
+            return '';
+        }
+
+        $tag = strtolower($node->tagName);
+        if (in_array($tag, ['script', 'style'], true)) {
+            return '';
+        }
+        if ($tag === 'br') {
+            return "\n";
+        }
+        if ($tag === 'pre' || $tag === 'code') {
+            $text = $node->textContent;
+            if ($telegram) {
+                return '<' . $tag . '>' . htmlspecialchars($text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') . '</' . $tag . '>';
+            }
+            return strpos($text, '```') === false ? '```' . $text . '```' : $text;
+        }
+
+        $text = '';
+        foreach ($node->childNodes as $child) {
+            $text .= $this->formatEditorNode($child, $telegram);
+        }
+
+        if ($tag === 'a') {
+            $url = trim($node->getAttribute('href'));
+            $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+            if (in_array($scheme, ['http', 'https'], true) && filter_var($url, FILTER_VALIDATE_URL)) {
+                if (trim($text) === '') {
+                    return $telegram ? htmlspecialchars($url, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') : $url;
+                }
+                if ($node->getElementsByTagName('code')->length || $node->getElementsByTagName('pre')->length) {
+                    return $text . ' (' . ($telegram ? htmlspecialchars($url, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8') : $url) . ')';
+                }
+                if ($telegram) {
+                    return '<a href="' . htmlspecialchars($url, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') . '">' . $text . '</a>';
+                }
+                return trim($node->textContent) === $url ? $text : $text . ' (' . $url . ')';
+            }
+            return $text;
+        }
+
+        $telegramTags = ['b' => 'b', 'strong' => 'b', 'i' => 'i', 'em' => 'i', 'u' => 'u', 's' => 's', 'strike' => 's', 'del' => 's'];
+        $whatsappTags = ['b' => '*', 'strong' => '*', 'i' => '_', 'em' => '_', 's' => '~', 'strike' => '~', 'del' => '~'];
+        if (trim($text) !== '') {
+            if (($telegram && isset($telegramTags[$tag])) || (!$telegram && isset($whatsappTags[$tag]))) {
+                if ($node->getElementsByTagName('code')->length || $node->getElementsByTagName('pre')->length) {
+                    return $text;
+                }
+            }
+            if ($telegram && isset($telegramTags[$tag])) {
+                return '<' . $telegramTags[$tag] . '>' . $text . '</' . $telegramTags[$tag] . '>';
+            }
+            if (!$telegram && isset($whatsappTags[$tag])) {
+                preg_match('/^(\s*)(.*?)(\s*)$/us', $text, $parts);
+                return $parts[1] . $whatsappTags[$tag] . $parts[2] . $whatsappTags[$tag] . $parts[3];
+            }
+        }
+        if ($tag === 'li') {
+            return '- ' . trim($text) . "\n";
+        }
+        if (in_array($tag, ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote'], true)) {
+            return $text . "\n\n";
+        }
+        return $text;
     }
 }

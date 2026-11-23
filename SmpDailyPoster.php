@@ -412,6 +412,8 @@ class SmpDailyPoster
             return null;
         }
 
+        require_once $this->directory . 'SmpImageGenerator.php';
+        $math = new SmpImageGenerator();
         $pollOptions = [];
         $correctOption = null;
         foreach ($options as $index => $option) {
@@ -421,7 +423,11 @@ class SmpDailyPoster
             if (strtoupper($match[1]) === $answerKey) {
                 $correctOption = $index;
             }
-            $pollOptions[] = mb_substr(trim($match[2]), 0, 100);
+            $optionText = trim($math->convertMathJaxToUnicode(trim($match[2])));
+            if ($optionText === '' || mb_strlen($optionText) > 100) {
+                return null;
+            }
+            $pollOptions[] = $optionText;
         }
         if ($correctOption === null) {
             return null;
@@ -430,13 +436,16 @@ class SmpDailyPoster
         $stemHtml = preg_replace('/<(ol|ul)\b[^>]*>.*?<\/\1>/is', ' ', (string)$question['content']);
         $stem = html_entity_decode(strip_tags($stemHtml ?? ''), ENT_QUOTES, 'UTF-8');
         $stem = preg_replace('/(?:^|\n)\s*\(?[A-L]\)?[\)\.]\s*[^\n]+/mi', ' ', $stem) ?? $stem;
+        $stem = $math->convertMathJaxToUnicode($stem);
         $stem = trim(preg_replace('/\s+/u', ' ', $stem) ?? $stem);
-        if ($stem === '') {
+        // Telegram rejects poll questions over 300 characters; fall back to the image post instead of truncating
+        if ($stem === '' || mb_strlen($stem) > 300) {
             return null;
         }
 
         return [
-            'question' => mb_substr($stem, 0, 300),
+            'intro' => "📝 Question of the Day\n\n" . $question['title'] . "\n\n🔗 Answer & Discussion: " . $url,
+            'question' => $stem,
             'options' => $pollOptions,
             'correct_option_id' => $correctOption,
             'explanation' => mb_substr('Answer and discussion: ' . $url, 0, 200),
