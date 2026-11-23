@@ -935,9 +935,11 @@ class SmpPoster
         if (empty($title)) {
             $title = 'New Video';
         }
-        $title = str_replace(['<', '>'], '', $title);
+        $title = str_replace(['<', '>'], ['‹', '›'], $title);
         $title = mb_substr(trim($title), 0, 95) . ' #Shorts';
-        $description = strip_tags($message);
+        // YouTube rejects < and > in metadata; strip_tags() would drop everything after "a<b"
+        $description = str_replace(['<', '>'], ['‹', '›'], $message);
+        $description = mb_strcut($description, 0, 5000, 'UTF-8');
 
         // Step 4: Initialize resumable upload
         $metadata = [
@@ -1173,8 +1175,22 @@ class SmpPoster
             }
         }
 
-        // Fallback: generate a simple color background video with text via ffmpeg drawtext
-        $escapedText = str_replace(["'", '"', '\\', ':', '%'], ["\'", '\"', '\\\\', '\\:', '%%'], mb_substr($text, 0, 200));
+        // Fallback: generate a simple color background video with wrapped text via ffmpeg drawtext
+        $lines = [];
+        foreach (preg_split('/\R/u', trim($text)) as $paragraph) {
+            $paragraph = trim($paragraph);
+            if ($paragraph === '') {
+                $lines[] = '';
+                continue;
+            }
+            foreach (explode("\n", wordwrap($paragraph, 38, "\n", true)) as $line) {
+                $lines[] = $line;
+            }
+        }
+        $lines = array_slice($lines, 0, 30);
+        $fontSize = count($lines) > 20 ? 32 : 40;
+        $lineHeight = $fontSize + 16;
+        $top = max(40, (int)((1920 - count($lines) * $lineHeight) / 2));
 
         // Find a font for drawtext
         $font = '';
@@ -1185,22 +1201,35 @@ class SmpPoster
         ];
         foreach ($fontPaths as $fp) {
             if (file_exists($fp)) {
-                $font = ':fontfile=' . escapeshellarg($fp);
+                $font = ':fontfile=' . $fp;
                 break;
             }
         }
 
-        $drawtext = "drawtext=text='" . $escapedText . "'" . $font
-            . ":fontsize=36:fontcolor=white:x=(w-text_w)/2:y=(h-text_h)/2:line_spacing=10";
+        // One drawtext per line: some ffmpeg builds render "\n" in textfile as a box glyph
+        $filters = [];
+        $textFiles = [];
+        foreach ($lines as $i => $line) {
+            if (trim($line) === '') {
+                continue;
+            }
+            $textFile = $uploadDir . $filename . '_' . $i . '.txt';
+            file_put_contents($textFile, $line);
+            $textFiles[] = $textFile;
+            $filters[] = 'drawtext=textfile=' . $textFile . $font . ':expansion=none'
+                . ':fontsize=' . $fontSize . ':fontcolor=white:x=60:y=' . ($top + $i * $lineHeight);
+        }
+        $drawtext = $filters ? implode(',', $filters) : 'null';
 
         $cmd = escapeshellcmd($ffmpegPath)
-            . ' -y -f lavfi -i ' . escapeshellarg('color=c=0x333333:s=1080x1920:d=15:r=30')
+            . ' -nostdin -y -f lavfi -i ' . escapeshellarg('color=c=0x333333:s=1080x1920:d=15:r=30')
             . ' -vf ' . escapeshellarg($drawtext)
             . ' -c:v libx264 -pix_fmt yuv420p -t 15'
             . ' ' . escapeshellarg($outputPath)
             . ' 2>&1';
 
         exec($cmd, $output, $returnCode);
+        array_map('unlink', $textFiles);
 
         if ($returnCode === 0 && file_exists($outputPath)) {
             return $outputPath;
